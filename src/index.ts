@@ -999,6 +999,18 @@ export class MicrosoftRewardsBot {
                     // deploy:account-platforms 账号级开关：只跑一端时另一端不搜
                     const doMobileSearch = plan.doMobile && account.platforms !== 'desktop'
                     const doDesktopSearch = plan.doDesktop && account.platforms !== 'mobile'
+                    this.logger.info(
+                        'main',
+                        'FLOW',
+                        '平台开关 | ' +
+                            account.email +
+                            ' | platforms=' +
+                            account.platforms +
+                            ' | 移动端搜索=' +
+                            (doMobileSearch ? '开' : '关') +
+                            ' | 桌面端搜索=' +
+                            (doDesktopSearch ? '开' : '关')
+                    )
                     const desktopBrowserNeeded =
                         account.platforms !== 'mobile' && (this.config.workers.doPunchCards || doVisualSearch)
 
@@ -1074,8 +1086,21 @@ export class MicrosoftRewardsBot {
                     }
 
                     const plan = await this.searchManager.getSearchPoints()
-                    const doMobileSearch = plan.doMobile
-                    const doDesktopSearch = plan.doDesktop
+                    // deploy:account-platforms 账号级开关：只跑一端时另一端不搜
+                    const doMobileSearch = plan.doMobile && account.platforms !== 'desktop'
+                    const doDesktopSearch = plan.doDesktop && account.platforms !== 'mobile'
+                    this.logger.info(
+                        'main',
+                        'FLOW',
+                        '平台开关 | ' +
+                            account.email +
+                            ' | platforms=' +
+                            account.platforms +
+                            ' | 移动端搜索=' +
+                            (doMobileSearch ? '开' : '关') +
+                            ' | 桌面端搜索=' +
+                            (doDesktopSearch ? '开' : '关')
+                    )
 
                     const desktopBrowserNeeded =
                         account.platforms !== 'mobile' &&
