@@ -11,6 +11,13 @@ function sanitizeProxyUrl(value) {
     }
 }
 
+// deploy:account-platforms 仅用于展示；判定逻辑在 src/util/Load.ts 的 buildPlatforms，
+// 两边规则保持一致：非法值一律退回 both。
+function normalizePlatforms(value) {
+    const v = String(value ?? '').trim().toLowerCase();
+    return v === 'mobile' || v === 'desktop' ? v : 'both';
+}
+
 export function loadAccounts(sourceEnv = process.env) {
     const accounts = []
 
@@ -25,6 +32,7 @@ export function loadAccounts(sourceEnv = process.env) {
             emailKey: email, // internal history join key; removed before returning the response
             geoLocale: normalizeGeoLocale(envStrFrom(sourceEnv, `ACCOUNT_${i}_GEO_LOCALE`) ?? 'auto'),
             langCode: normalizeLanguageCode(envStrFrom(sourceEnv, `ACCOUNT_${i}_LANG_CODE`) ?? 'en'),
+            platforms: normalizePlatforms(envStrFrom(sourceEnv, `ACCOUNT_${i}_PLATFORMS`)),
             hasRecoveryEmail: Boolean(envStrFrom(sourceEnv, `ACCOUNT_${i}_RECOVERY_EMAIL`)),
             hasTotp: Boolean(envStrFrom(sourceEnv, `ACCOUNT_${i}_TOTP_SECRET`)),
             proxy: proxyUrl

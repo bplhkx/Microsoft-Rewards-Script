@@ -15,7 +15,7 @@ import {
     syncMissingDefaults
 } from './configEditor.js'
 import { readSchedule, writeSchedule } from './scheduleStore.js'
-import { addAccount } from './accountStore.js'
+import { addAccount, updateAccountPlatform } from './accountStore.js'
 import { deleteStoredSessions, listStoredSessions } from './sessionStore.js'
 import { resolveRunCommand } from './runCommand.js'
 import {
@@ -350,6 +350,7 @@ const requestHandler = async (req, res) => {
                     'GET /history',
                     'GET /accounts',
                     'POST /accounts',
+                    'PATCH /accounts/:index',
                     'GET /sessions',
                     'GET /diagnostics',
                     'GET /events',
@@ -515,6 +516,48 @@ const requestHandler = async (req, res) => {
             } catch (err) {
                 const status =
                     err.code === 'DUPLICATE' ? 409 : err.code === 'INVALID' ? 400 : 500
+                return sendJson(res, status, {
+                    error: err.message,
+                    code: err.code || 'FAILED'
+                })
+            }
+        }
+
+        // 部署侧扩展：修改已存在账号的"跑哪一端"（写回项目根 .env，需 API_ALLOW_ACCOUNT_WRITE=true）
+        if (method === 'PATCH' && pathname.startsWith('/accounts/')) {
+            if (!ALLOW_ACCOUNT_WRITE) {
+                return sendJson(res, 403, {
+                    error: 'Account writes are disabled. Set API_ALLOW_ACCOUNT_WRITE=true to enable.',
+                    code: 'DISABLED'
+                })
+            }
+            if (pm.getStatus().state !== 'idle') {
+                return sendJson(res, 409, {
+                    error: 'Cannot change accounts while a bot run is active. Stop the run first.',
+                    code: 'RUN_ACTIVE'
+                })
+            }
+            const rawIndex = pathname.slice('/accounts/'.length).trim()
+            const index = Number(rawIndex)
+            if (!/^[1-9]\d*$/.test(rawIndex)) {
+                return sendJson(res, 400, {
+                    error: 'PATCH /accounts/:index needs a positive integer account index.',
+                    code: 'INVALID_INDEX'
+                })
+            }
+            const body = await readJsonBody(req)
+            try {
+                const result = updateAccountPlatform(projectRoot, index, body)
+                pm.note('info', `ACCOUNT_${result.index} platforms=${result.platforms} 已通过 API 修改。`)
+                return sendJson(res, 200, {
+                    updated: true,
+                    ...result,
+                    count: loadAccounts().length,
+                    appliesOnNextRun: true
+                })
+            } catch (err) {
+                const status =
+                    err.code === 'NOT_FOUND' ? 404 : err.code === 'INVALID' ? 400 : 500
                 return sendJson(res, status, {
                     error: err.message,
                     code: err.code || 'FAILED'
