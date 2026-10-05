@@ -121,7 +121,11 @@ export function addAccount(projectRoot, payload, env = process.env) {
 
     const block = lines.join('\n') + '\n'
     try {
-        fs.appendFileSync(envFilePath, block, 'utf-8')
+        // 追加前必须确认文件以换行结尾：否则 "# 面板添加于 …" 会粘在上一条 ACCOUNT_N_* 后面，
+        // 既污染那个账号的最后一个字段，也会让按注释块清理旧账号时误删整块（2026-10-05 实测踩过）。
+        const current = fs.existsSync(envFilePath) ? fs.readFileSync(envFilePath, 'utf-8') : ''
+        const prefix = current && !/\n$/.test(current) ? '\n' : ''
+        fs.appendFileSync(envFilePath, prefix + block, 'utf-8')
     } catch (e) {
         // 回滚进程 env，避免留下"看得见但没落盘"的账号
         for (const key of written) delete env[key]
