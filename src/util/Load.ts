@@ -105,6 +105,12 @@ function buildProxy(index: string): AccountProxy {
     }
 }
 
+// deploy:account-platforms 读 ACCOUNT_N_PLATFORMS，非法值一律退回 both
+function buildPlatforms(index: string): 'both' | 'mobile' | 'desktop' {
+    const raw = (envStr(`ACCOUNT_${index}_PLATFORMS`) ?? 'both').trim().toLowerCase()
+    return raw === 'mobile' || raw === 'desktop' ? raw : 'both'
+}
+
 function buildSaveFingerprint(index: string): ConfigSaveFingerprint {
     return {
         mobile: envBool(`ACCOUNT_${index}_SAVE_FINGERPRINT_MOBILE`, false),
@@ -139,7 +145,8 @@ export function loadAccounts(): Account[] {
                 geoLocale: envStr(`ACCOUNT_${index}_GEO_LOCALE`) ?? 'auto',
                 langCode: envStr(`ACCOUNT_${index}_LANG_CODE`) ?? 'en',
                 proxy: buildProxy(index),
-                saveFingerprint: buildSaveFingerprint(index)
+                saveFingerprint: buildSaveFingerprint(index),
+                platforms: buildPlatforms(index)
             })
         }
 

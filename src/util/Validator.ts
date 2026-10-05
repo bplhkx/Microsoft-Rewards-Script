@@ -284,7 +284,9 @@ export const AccountSchema = z.object({
     saveFingerprint: z.object({
         mobile: z.boolean(),
         desktop: z.boolean()
-    })
+    }),
+    // deploy:account-platforms
+    platforms: z.enum(['both', 'mobile', 'desktop']).default('both')
 })
 
 const defaultConfig: Config = {

@@ -72,6 +72,40 @@ export function getCurrentContext(): ExecutionContext {
     return context
 }
 
+// ── 部署侧扩展（V4-china + 配套面板）deploy:tg-helper ──────────────
+// 上游的运行结束摘要只发给 PushPlus / Server酱 / ClawBot（见 run() 与 runTasks()），
+// Telegram / Discord / ntfy 只逐条转日志；而按行推送收紧为"只推整轮结果"后，
+// 崩溃路径（uncaughtException / unhandledRejection / MAIN-ERROR）会一条通知都不发。
+// 这里补两件事：摘要同样发一份给 Telegram；进程级致命错误兜底发一条（只发一次）。
+type TelegramConfigLike = Parameters<typeof sendTelegram>[0]
+type TelegramLevel = Parameters<typeof sendTelegram>[2]
+type WebhookLike = { webhook?: { telegram?: TelegramConfigLike } } | undefined
+
+function telegramTarget(config: WebhookLike): TelegramConfigLike | undefined {
+    const tg = config?.webhook?.telegram
+    return tg && tg.enabled && tg.botToken && tg.chatId ? tg : undefined
+}
+
+async function sendTelegramNotice(text: string, config: WebhookLike, level: TelegramLevel = 'info'): Promise<void> {
+    const tg = telegramTarget(config)
+    if (!tg) return
+    try {
+        await sendTelegram(tg, text, level)
+    } catch {
+        // 通知失败绝不影响主流程
+    }
+}
+
+let fatalNoticeSent = false
+async function notifyFatalExit(reason: unknown, config: WebhookLike): Promise<void> {
+    if (fatalNoticeSent) return
+    fatalNoticeSent = true
+    const text = String(reason instanceof Error ? reason.stack || reason.message : reason)
+        .replace(/\s+/g, ' ')
+        .slice(0, 800)
+    await sendTelegramNotice(`任务异常退出\n${text}`, config, 'error')
+}
+
 async function flushAllWebhooks(timeoutMs = 5000): Promise<void> {
     await Promise.allSettled([
         flushDiscordQueue(timeoutMs),
@@ -392,6 +426,11 @@ export class MicrosoftRewardsBot {
                 await this.sendPushPlusSummary(allAccountStats, runStartTime, hadWorkerFailure)
                 await this.sendServerChanSummary(allAccountStats, runStartTime, hadWorkerFailure)
                 await this.sendClawBotSummary(allAccountStats, runStartTime, hadWorkerFailure)
+                // deploy:tg-summary-cluster
+                await sendTelegramNotice(
+                    this.buildSummaryMessage(allAccountStats, runStartTime, hadWorkerFailure),
+                    this.config
+                )
                 await flushAllWebhooks()
 
                 if (!hadWorkerFailure) markRunSucceeded()
@@ -646,6 +685,11 @@ export class MicrosoftRewardsBot {
             await this.sendPushPlusSummary(accountStats, runStartTime, hadFailure)
             await this.sendServerChanSummary(accountStats, runStartTime, hadFailure)
             await this.sendClawBotSummary(accountStats, runStartTime, hadFailure)
+            // deploy:tg-summary-single
+            await sendTelegramNotice(
+                this.buildSummaryMessage(accountStats, runStartTime, hadFailure),
+                this.config
+            )
             await flushAllWebhooks()
 
             if (!hadFailure) markRunSucceeded()
@@ -774,6 +818,8 @@ export class MicrosoftRewardsBot {
                 // 桌面会话预热：登录完立即保存并关闭，把需要人工批准的桌面登录
                 // 挪到运行开头（紧跟移动端批准之后）；后续桌面阶段从 SQLite 恢复会话，不再触发批准
                 const prewarmDesktop =
+                    // 只跑移动端时不预热桌面会话 deploy:account-platforms
+                    account.platforms !== 'mobile' &&
                     this.config.prewarmDesktopLogin &&
                     (this.config.workers.doPunchCards ||
                         this.config.workers.doVisualSearch ||
@@ -950,9 +996,11 @@ export class MicrosoftRewardsBot {
                     }
 
                     const plan = await this.searchManager.getSearchPoints()
-                    const doMobileSearch = plan.doMobile
-                    const doDesktopSearch = plan.doDesktop
-                    const desktopBrowserNeeded = this.config.workers.doPunchCards || doVisualSearch
+                    // deploy:account-platforms 账号级开关：只跑一端时另一端不搜
+                    const doMobileSearch = plan.doMobile && account.platforms !== 'desktop'
+                    const doDesktopSearch = plan.doDesktop && account.platforms !== 'mobile'
+                    const desktopBrowserNeeded =
+                        account.platforms !== 'mobile' && (this.config.workers.doPunchCards || doVisualSearch)
 
                     if (doDesktopSearch && !desktopBrowserNeeded) {
                         this.cookies.desktop = [...this.cookies.mobile]
@@ -1030,7 +1078,8 @@ export class MicrosoftRewardsBot {
                     const doDesktopSearch = plan.doDesktop
 
                     const desktopBrowserNeeded =
-                        this.config.workers.doPunchCards || doVisualSearch || (doDesktopSearch && !apiSearch)
+                        account.platforms !== 'mobile' &&
+                        (this.config.workers.doPunchCards || doVisualSearch || (doDesktopSearch && !apiSearch))
 
                     if (apiSearch && doDesktopSearch && !desktopBrowserNeeded) {
                         this.cookies.desktop = [...this.cookies.mobile]
@@ -1191,6 +1240,8 @@ async function main(): Promise<void> {
             return
         }
         rewardsBot.logger.error('main', 'UNCAUGHT-EXCEPTION', error)
+        // deploy:tg-fatal-uncaught
+        await notifyFatalExit(error, rewardsBot.config)
         await flushAllWebhooks()
         process.exit(1)
     })
@@ -1204,6 +1255,8 @@ async function main(): Promise<void> {
             return
         }
         rewardsBot.logger.error('main', 'UNHANDLED-REJECTION', reason as Error)
+        // deploy:tg-fatal-rejection
+        await notifyFatalExit(reason, rewardsBot.config)
         await flushAllWebhooks()
         process.exit(1)
     })
@@ -1213,6 +1266,8 @@ async function main(): Promise<void> {
         await rewardsBot.run()
     } catch (error) {
         rewardsBot.logger.error('main', 'MAIN-ERROR', error as Error)
+        // deploy:tg-fatal-main
+        await notifyFatalExit(error, rewardsBot.config)
         await flushAllWebhooks()
         process.exitCode = 1
     }
@@ -1221,6 +1276,8 @@ async function main(): Promise<void> {
 main().catch(async error => {
     const tmpBot = new MicrosoftRewardsBot()
     tmpBot.logger.error('main', 'MAIN-ERROR', error as Error)
+    // deploy:tg-fatal-bootstrap
+    await notifyFatalExit(error, tmpBot.config)
     await flushAllWebhooks()
     process.exit(1)
 })

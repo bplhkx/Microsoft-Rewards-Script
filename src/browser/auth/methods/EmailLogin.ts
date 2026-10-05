@@ -59,19 +59,29 @@ export class EmailLogin {
 
     async enterPassword(page: Page, password: string): Promise<'ok' | 'needs-2fa' | 'error'> {
         try {
-            const passwordInputSelector = 'input[type="password"]'
-            const passwordField = await page
-                .waitForSelector(passwordInputSelector, { state: 'visible', timeout: 1000 })
-                .catch(() => {})
+            // deploy:password-race 状态机检测的是 [data-testid="passwordEntry"]（checkSelector 等 5 秒），
+            // 而真正的 <input> 在客户端切换出来的密码视图里会晚一点挂载；原来只等 1 秒且选择器单一，
+            // 桌面阶段经常在这里误判"未找到密码字段"，进而让整轮以致命错误中止、已挣积分统计一起归零。
+            const passwordInputSelector = 'input[type="password"], input[name="passwd"]'
+            const waitForPassword = () =>
+                page.waitForSelector(passwordInputSelector, { state: 'visible', timeout: 10000 }).catch(() => undefined)
+
+            let passwordField = await waitForPassword()
+            if (!passwordField) {
+                this.bot.logger.warn(this.bot.isMobile, 'LOGIN-ENTER-PASSWORD', '密码字段暂未出现，重试一次')
+                await this.bot.utils.wait(2000)
+                passwordField = await waitForPassword()
+            }
             if (!passwordField) {
                 this.bot.logger.warn(this.bot.isMobile, 'LOGIN-ENTER-PASSWORD', '未找到密码字段')
                 return 'error'
             }
 
             await this.bot.utils.wait(1000)
-            await page.fill(passwordInputSelector, '').catch(() => {})
+            // 用已解析到的元素句柄填写，避免逗号选择器在严格模式下歧义
+            await passwordField.fill('').catch(() => {})
             await this.bot.utils.wait(500)
-            await page.fill(passwordInputSelector, password).catch(() => {})
+            await passwordField.fill(password).catch(() => {})
             await this.bot.utils.wait(1000)
 
             const submitButton = await page

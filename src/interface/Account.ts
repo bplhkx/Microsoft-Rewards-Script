@@ -7,6 +7,8 @@ export interface Account {
     langCode: string
     proxy: AccountProxy
     saveFingerprint: ConfigSaveFingerprint
+    // deploy:account-platforms 该账号跑哪一端的搜索/活动：both | mobile | desktop
+    platforms: 'both' | 'mobile' | 'desktop'
 }
 
 export interface AccountProxy {

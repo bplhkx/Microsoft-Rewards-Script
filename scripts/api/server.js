@@ -15,6 +15,7 @@ import {
     syncMissingDefaults
 } from './configEditor.js'
 import { readSchedule, writeSchedule } from './scheduleStore.js'
+import { addAccount } from './accountStore.js'
 import { deleteStoredSessions, listStoredSessions } from './sessionStore.js'
 import { resolveRunCommand } from './runCommand.js'
 import {
@@ -114,6 +115,7 @@ const ALLOW_ENV_OVERRIDES = envBool('API_ALLOW_ENV_OVERRIDES', false)
 const REVEAL_ENABLED = envBool('API_ALLOW_CONFIG_REVEAL', false)
 const ALLOW_CONFIG_WRITE = envBool('API_ALLOW_CONFIG_WRITE', false)
 const ALLOW_SCHEDULE_WRITE = envBool('API_ALLOW_SCHEDULE_WRITE', false)
+const ALLOW_ACCOUNT_WRITE = envBool('API_ALLOW_ACCOUNT_WRITE', false)
 
 const RUN_HISTORY = integerSetting('API_RUN_HISTORY', envStr('API_RUN_HISTORY'), 20)
 const DIAG_DIR = envStr('API_DIAGNOSTICS_DIR') ?? path.join(projectRoot, 'diagnostics')
@@ -347,6 +349,7 @@ const requestHandler = async (req, res) => {
                     'GET /errors',
                     'GET /history',
                     'GET /accounts',
+                    'POST /accounts',
                     'GET /sessions',
                     'GET /diagnostics',
                     'GET /events',
@@ -481,6 +484,42 @@ const requestHandler = async (req, res) => {
 
             pm.note('info', `Deleted ${result.removed} stored session row(s) for ${result.email} via API.`)
             return sendJson(res, 200, { deleted: true, ...result })
+        }
+
+        // 部署侧扩展：新增账号（写入项目根 .env，需 API_ALLOW_ACCOUNT_WRITE=true）
+        if (method === 'POST' && pathname === '/accounts') {
+            if (!ALLOW_ACCOUNT_WRITE) {
+                return sendJson(res, 403, {
+                    error: 'Account writes are disabled. Set API_ALLOW_ACCOUNT_WRITE=true to enable.',
+                    code: 'DISABLED'
+                })
+            }
+            if (pm.getStatus().state !== 'idle') {
+                return sendJson(res, 409, {
+                    error: 'Cannot add accounts while a bot run is active. Stop the run first.',
+                    code: 'RUN_ACTIVE'
+                })
+            }
+            const body = await readJsonBody(req)
+            try {
+                const result = addAccount(projectRoot, body)
+                pm.note('info', `Added ACCOUNT_${result.index} (${result.email}) via API.`)
+                return sendJson(res, 201, {
+                    added: true,
+                    index: result.index,
+                    email: result.email,
+                    fields: result.fields,
+                    count: loadAccounts().length,
+                    appliesOnNextRun: true
+                })
+            } catch (err) {
+                const status =
+                    err.code === 'DUPLICATE' ? 409 : err.code === 'INVALID' ? 400 : 500
+                return sendJson(res, status, {
+                    error: err.message,
+                    code: err.code || 'FAILED'
+                })
+            }
         }
 
         // diag list

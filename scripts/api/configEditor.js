@@ -262,8 +262,19 @@ export function writeConfigAtomic(projectRoot, cfg) {
             // best-effort backup
         }
     }
+    const json = JSON.stringify(cfg, null, 2)
+    // 部署侧修正：target 常常是指向挂载目录的符号链接，rename 会把链接换成
+    // 容器内普通文件，导致面板改动不落盘、重建容器即丢。是链接时改为透过链接写。
+    let isSymlink = false
+    try {
+        isSymlink = fs.lstatSync(target).isSymbolicLink()
+    } catch {}
+    if (isSymlink) {
+        fs.writeFileSync(target, json)
+        return target
+    }
     const tmp = `${target}.${process.pid}.tmp`
-    fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2))
+    fs.writeFileSync(tmp, json)
     fs.renameSync(tmp, target)
     return target
 }
