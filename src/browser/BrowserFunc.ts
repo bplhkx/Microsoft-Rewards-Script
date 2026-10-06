@@ -1,7 +1,7 @@
 import { URLs } from '../constants/urls'
 import { BING_APP_USER_AGENT } from '../constants/userAgents'
 import type { BrowserContext, Cookie, Page } from 'patchright'
-import type { HttpRequestConfig } from '../util/Http'
+import type { HttpRequestConfig, HttpResponse } from '../util/Http'
 
 import type { MicrosoftRewardsBot } from '../index'
 import type { PageSnapshot, ParsedOffer } from './ReactFunc'
@@ -152,6 +152,35 @@ export default class BrowserFunc {
         return error instanceof Error ? error.message : String(error)
     }
 
+    /**
+     * deploy:rps-retry - prod.rewardsplatform.microsoft.com answers `401` with an empty body and
+     * the header `x-auth-info: RPS Not initialized` whenever a request lands on a backend that has
+     * not initialised this account's Rewards Platform session. Measured 2026-10-06 with one fixed
+     * request and a fresh token: 3 of 12 new connections returned 200 (73 KB of real data), while
+     * reusing a single keep-alive socket returned 401 six times in a row - the edge re-pools per
+     * request, so connection stickiness is not an option. Retrying on a new connection is: Http.ts
+     * treats every 4xx as permanent and never retries it, which is why the app activities were
+     * silently skipped for the whole run.
+     */
+    private async requestRpsReady<T>(request: HttpRequestConfig, source: string, attempts = 8): Promise<HttpResponse<T>> {
+        for (let attempt = 1; ; attempt++) {
+            try {
+                return await this.bot.http.request<T>({ ...request, retries: 0 })
+            } catch (error) {
+                const res = (error as { response?: HttpResponse<T> })?.response
+                const authInfo = String(res?.headers?.['x-auth-info'] ?? '')
+                const notReady = res?.status === 401 && /not initialized/i.test(authInfo)
+                if (!notReady || attempt >= attempts) throw error
+                this.bot.logger.debug(
+                    this.bot.isMobile,
+                    source,
+                    `RPS 尚未就绪，换新连接重试 ${attempt}/${attempts} | x-auth-info=${authInfo}`
+                )
+                await new Promise(resolve => setTimeout(resolve, 250 * attempt))
+            }
+        }
+    }
+
     async getAppDashboardData(): Promise<AppDashboardData> {
         try {
             const request: HttpRequestConfig = {
@@ -166,7 +195,7 @@ export default class BrowserFunc {
                 }
             }
 
-            const response = await this.bot.http.request(request)
+            const response = await this.requestRpsReady<AppDashboardData>(request, 'GET-APP-DASHBOARD-DATA')
             return response.data as AppDashboardData
         } catch (error) {
             // deploy:app-401-detail - "Request failed with status code 401" told us nothing.
@@ -257,7 +286,7 @@ export default class BrowserFunc {
                 }
             }
 
-            const response = await this.bot.http.request<AppUserData>(request)
+            const response = await this.requestRpsReady<AppUserData>(request, 'GET-APP-EARNABLE-POINTS')
             const userData: AppUserData = response.data
             const eligibleActivities = userData.response.promotions.filter(x =>
                 eligibleOffers.includes(x.attributes.offerid ?? '')
