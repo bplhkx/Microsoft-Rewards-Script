@@ -168,7 +168,7 @@ export default class BrowserFunc {
             this.bot.logger.error(
                 this.bot.isMobile,
                 'GET-APP-DASHBOARD-DATA',
-                `获取 App 仪表板数据出错: ${error instanceof Error ? error.message : String(error)}`
+                `Error fetching dashboard data: ${error instanceof Error ? error.message : String(error)}`
             )
             throw error
         }
@@ -221,7 +221,7 @@ export default class BrowserFunc {
             this.bot.logger.error(
                 this.bot.isMobile,
                 'GET-BROWSER-EARNABLE-POINTS',
-                `发生错误: ${error instanceof Error ? error.message : String(error)}`
+                `An error occurred: ${error instanceof Error ? error.message : String(error)}`
             )
             throw error
         }
@@ -281,7 +281,7 @@ export default class BrowserFunc {
             this.bot.logger.error(
                 this.bot.isMobile,
                 'GET-APP-EARNABLE-POINTS',
-                `发生错误: ${error instanceof Error ? error.message : String(error)}`
+                `An error occurred: ${error instanceof Error ? error.message : String(error)}`
             )
             throw error
         }
@@ -296,7 +296,7 @@ export default class BrowserFunc {
             this.bot.logger.error(
                 this.bot.isMobile,
                 'GET-CURRENT-POINTS',
-                `发生错误: ${error instanceof Error ? error.message : String(error)}`
+                `An error occurred: ${error instanceof Error ? error.message : String(error)}`
             )
             throw error
         }
@@ -340,7 +340,7 @@ export default class BrowserFunc {
                 this.bot.logger.warn(
                     this.bot.isMobile,
                     'BOOTSTRAP',
-                    '未解析到任何优惠活动 - 页面可能未渲染 RSC 载荷（请检查登录/重定向）'
+                    'No offers parsed - page may not have rendered the RSC payload (check login/redirect)'
                 )
             }
 
@@ -348,27 +348,27 @@ export default class BrowserFunc {
                 this.bot.logger.warn(
                     this.bot.isMobile,
                     'BOOTSTRAP',
-                    '未发现任何 action id - server-action 调用将失败（bundle 可能已剥离名称）'
+                    'No action ids discovered - server-action calls will fail (bundle may have stripped names)'
                 )
             }
 
             this.bot.logger.info(
                 this.bot.isMobile,
                 'BOOTSTRAP',
-                `上下文就绪 | actions=${Object.keys(this.bot.nextActions).length} | 可上报=${this.bot.reactSnapshot.reportable.length} | 可用积分=${this.bot.reactSnapshot.account.availablePoints}`
+                `Context ready | actions=${Object.keys(this.bot.nextActions).length} | reportable=${this.bot.reactSnapshot.reportable.length} | available=${this.bot.reactSnapshot.account.availablePoints}`
             )
 
             this.bot.logger.info(
                 this.bot.isMobile,
                 'BUILD',
-                `Rewards 构建 | id=${this.rewardsDeploymentId || 'unknown'}`,
+                `Rewards build | id=${this.rewardsDeploymentId || 'unknown'}`,
                 'cyan'
             )
         } catch (error) {
             this.bot.logger.error(
                 this.bot.isMobile,
                 'BOOTSTRAP',
-                `获取上下文失败 | 错误=${error instanceof Error ? error.message : String(error)}`
+                `Failed acquiring context | error=${error instanceof Error ? error.message : String(error)}`
             )
             throw error
         }
@@ -406,13 +406,13 @@ export default class BrowserFunc {
             this.bot.logger.warn(
                 this.bot.isMobile,
                 'BOOTSTRAP',
-                `获取 ${route} HTML 失败 | 状态码=${res.status()} - 快照和 action 发现可能不完整`
+                `Failed to fetch ${route} HTML | status=${res.status()} - snapshot and action discovery may be incomplete`
             )
         } catch (error) {
             this.bot.logger.warn(
                 this.bot.isMobile,
                 'BOOTSTRAP',
-                `获取 ${route} HTML 失败 | 错误=${error instanceof Error ? error.message : String(error)} - 快照和 action 发现可能不完整`
+                `Failed to fetch ${route} HTML | error=${error instanceof Error ? error.message : String(error)} - snapshot and action discovery may be incomplete`
             )
         }
 
@@ -436,11 +436,11 @@ export default class BrowserFunc {
                 this.bot.logger.warn(
                     this.bot.isMobile,
                     'BOOTSTRAP',
-                    '未在 HTML 中发现初始代码块 - 代码块引用形式可能已变化'
+                    'No initial chunks discovered in HTML - chunk reference shape may have changed'
                 )
             }
 
-            this.bot.logger.debug(this.bot.isMobile, 'BOOTSTRAP', `正在获取 ${initialChunks.size} 个初始 JS 代码块`)
+            this.bot.logger.debug(this.bot.isMobile, 'BOOTSTRAP', `Fetching ${initialChunks.size} initial JS chunks`)
             const jsByPath = await this.fetchJsChunks(page, [...initialChunks])
 
             const dynamicPaths = new Set<string>()
@@ -470,10 +470,10 @@ export default class BrowserFunc {
                     this.bot.logger.debug(
                         this.bot.isMobile,
                         'BOOTSTRAP',
-                        `在 ${filename} 中发现 ${names.length} 个 action id: [${names.join(', ')}]`
+                        `Found ${names.length} action id(s) in ${filename}: [${names.join(', ')}]`
                     )
                 } else {
-                    this.bot.logger.debug(this.bot.isMobile, 'BOOTSTRAP', `在 ${filename} 中未发现 server-action id`)
+                    this.bot.logger.debug(this.bot.isMobile, 'BOOTSTRAP', `No server-action ids found in ${filename}`)
                 }
 
                 const namedSet = new Set(Object.values(ids.byName))
@@ -482,7 +482,7 @@ export default class BrowserFunc {
                     this.bot.logger.debug(
                         this.bot.isMobile,
                         'BOOTSTRAP',
-                        `在 ${filename} 中发现 ${unnamed.length} 个未命名 action id: [${unnamed.join(', ')}]`
+                        `Found ${unnamed.length} unnamed action id(s) in ${filename}: [${unnamed.join(', ')}]`
                     )
                 }
             }
@@ -490,13 +490,13 @@ export default class BrowserFunc {
             this.bot.logger.debug(
                 this.bot.isMobile,
                 'BOOTSTRAP',
-                `已发现 ${Object.keys(result).length} 个 action id: [${Object.keys(result).join(', ')}]`
+                `Discovered ${Object.keys(result).length} action ids: [${Object.keys(result).join(', ')}]`
             )
         } catch (error) {
             this.bot.logger.error(
                 this.bot.isMobile,
                 'BOOTSTRAP',
-                `解析 action id 失败 | 错误=${error instanceof Error ? error.message : String(error)}`
+                `Failed resolving action ids | error=${error instanceof Error ? error.message : String(error)}`
             )
         }
 
@@ -517,7 +517,7 @@ export default class BrowserFunc {
                     this.bot.logger.debug(
                         this.bot.isMobile,
                         'BOOTSTRAP',
-                        `代码块获取失败 | 路径=${path} | ${error instanceof Error ? error.message : String(error)}`
+                        `Chunk fetch failed | path=${path} | ${error instanceof Error ? error.message : String(error)}`
                     )
                 }
             })
@@ -562,7 +562,7 @@ export default class BrowserFunc {
                 this.bot.logger.debug(
                     this.bot.isMobile,
                     'CLOSE-BROWSER',
-                    `正在保存会话 | Cookie数=${storageState.cookies.length} | origins=${storageState.origins.length}`
+                    `Saving session | cookies=${storageState.cookies.length} | origins=${storageState.origins.length}`
                 )
                 saveStorageState(this.bot.config.sessionPath, email, this.bot.isMobile, storageState)
             }
@@ -571,10 +571,10 @@ export default class BrowserFunc {
                 this.bot.logger.debug(
                     this.bot.isMobile,
                     'CLOSE-BROWSER',
-                    `会话未保存（浏览器已在关闭中）: ${error instanceof Error ? error.message : String(error)}`
+                    `Session not saved (browser already closing): ${error instanceof Error ? error.message : String(error)}`
                 )
             } else {
-                this.bot.logger.error(this.bot.isMobile, 'CLOSE-BROWSER', `保存会话失败: ${error}`)
+                this.bot.logger.error(this.bot.isMobile, 'CLOSE-BROWSER', `Failed to save session: ${error}`)
             }
         } finally {
             try {
@@ -584,15 +584,15 @@ export default class BrowserFunc {
                     await rootBrowser.close().catch(() => {})
                 }
 
-                this.bot.logger.info(this.bot.isMobile, 'CLOSE-BROWSER', '所有浏览器资源已关闭。')
+                this.bot.logger.info(this.bot.isMobile, 'CLOSE-BROWSER', 'All browser resources closed.')
             } catch (error) {
                 if (isBrowserClosedError(error)) {
-                    this.bot.logger.debug(this.bot.isMobile, 'CLOSE-BROWSER', '浏览器已处于关闭状态。')
+                    this.bot.logger.debug(this.bot.isMobile, 'CLOSE-BROWSER', 'Browser was already closed.')
                 } else {
                     this.bot.logger.warn(
                         this.bot.isMobile,
                         'CLOSE-BROWSER',
-                        '关闭时遇到错误，但进程仍在退出。'
+                        'Shutdown encountered an error, but process exiting.'
                     )
                 }
             }
@@ -621,13 +621,13 @@ export default class BrowserFunc {
             this.bot.logger.debug(
                 this.bot.isMobile,
                 'REWARDS-PAGE',
-                `获取 ${route} 失败 | 状态码=${response.status()}`
+                `Failed to fetch ${route} | status=${response.status()}`
             )
         } catch (error) {
             this.bot.logger.debug(
                 this.bot.isMobile,
                 'REWARDS-PAGE',
-                `浏览器请求 ${route} 失败 | ${error instanceof Error ? error.message : String(error)}`
+                `Browser fetch failed for ${route} | ${error instanceof Error ? error.message : String(error)}`
             )
         }
 
@@ -645,7 +645,7 @@ export default class BrowserFunc {
             this.bot.logger.debug(
                 this.bot.isMobile,
                 source,
-                '无法保存会话检查点，因为没有可用的活动浏览器页面'
+                'Could not checkpoint session because no active browser page is available'
             )
             return false
         }
@@ -657,7 +657,7 @@ export default class BrowserFunc {
             this.bot.logger.debug(
                 this.bot.isMobile,
                 source,
-                `无法保存活动会话检查点 | 错误=${error instanceof Error ? error.message : String(error)}`
+                `Could not checkpoint active session | error=${error instanceof Error ? error.message : String(error)}`
             )
             return false
         }
@@ -701,7 +701,7 @@ export default class BrowserFunc {
             this.bot.logger.debug(
                 this.bot.isMobile,
                 source,
-                `无法同步活动浏览器 Cookie | 错误=${error instanceof Error ? error.message : String(error)}`
+                `Could not synchronize active browser cookies | error=${error instanceof Error ? error.message : String(error)}`
             )
             return false
         }
@@ -733,7 +733,7 @@ export default class BrowserFunc {
             this.bot.logger.debug(
                 this.bot.isMobile,
                 source,
-                `已刷新 Cookie 缓存 | 之前=${cachedCookies.length} | 当前=${liveCookies.length}`
+                `Refreshed cookie cache | previous=${cachedCookies.length} | current=${liveCookies.length}`
             )
         }
 
@@ -755,13 +755,13 @@ export default class BrowserFunc {
             this.bot.logger.debug(
                 this.bot.isMobile,
                 source,
-                `已持久化活动浏览器会话 | Cookie数=${storageState.cookies.length} | origins=${storageState.origins.length}`
+                `Persisted live browser session | cookies=${storageState.cookies.length} | origins=${storageState.origins.length}`
             )
         } catch (error) {
             this.bot.logger.debug(
                 this.bot.isMobile,
                 source,
-                `无法持久化刷新后的 Cookie | 错误=${error instanceof Error ? error.message : String(error)}`
+                `Could not persist refreshed cookies | error=${error instanceof Error ? error.message : String(error)}`
             )
         }
     }
@@ -850,7 +850,7 @@ export default class BrowserFunc {
         this.bot.logger.debug(
             this.bot.isMobile,
             'COOKIE-SYNC',
-            `已应用 ${rawCookies.length} 个响应 Cookie 并持久化更新后的会话`
+            `Applied ${rawCookies.length} response cookie(s) and persisted the updated session`
         )
     }
 
@@ -1015,7 +1015,7 @@ export default class BrowserFunc {
             this.bot.logger.debug(
                 this.bot.isMobile,
                 'EARN-SNAPSHOT',
-                `通过 HTTP 获取 ${route} 失败 | ${error instanceof Error ? error.message : String(error)}`
+                `Failed to fetch ${route} over http | ${error instanceof Error ? error.message : String(error)}`
             )
             return null
         }
@@ -1028,7 +1028,7 @@ export default class BrowserFunc {
         this.bot.logger.debug(
             this.bot.isMobile,
             'EARN-SNAPSHOT',
-            `${offerId} 不在缓存快照中 (offers=${this.bot.reactSnapshot?.offers.length ?? 0}) - 正在重新获取 /earn 和 /dashboard`
+            `${offerId} absent from the cached snapshot (offers=${this.bot.reactSnapshot?.offers.length ?? 0}) - refetching /earn and /dashboard`
         )
 
         const refreshed = await this.refreshEarnSnapshot()
@@ -1043,7 +1043,7 @@ export default class BrowserFunc {
         this.bot.logger.debug(
             this.bot.isMobile,
             'EARN-SNAPSHOT',
-            `已重新获取 /earn 和 /dashboard | offers=${refreshed.offers.length} | ${offerId} 找到=${!!live}`
+            `Refetched /earn and /dashboard | offers=${refreshed.offers.length} | ${offerId} found=${!!live}`
         )
 
         return live

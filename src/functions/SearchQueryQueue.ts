@@ -22,7 +22,7 @@ export class SearchQueryQueue {
         this.bot.logger.debug(
             this.bot.isMobile,
             'QUERY-QUEUE',
-            `队列已准备 | 主题数=${this.topics.length} | 聚类搜索=${this.bot.config.searchSettings.clusterSearch}`
+            `Queue prepared | mainTopics=${this.topics.length} | clusterSearch=${this.bot.config.searchSettings.clusterSearch}`
         )
         return this.topics.length
     }
@@ -33,7 +33,7 @@ export class SearchQueryQueue {
                 this.bot.logger.debug(
                     this.bot.isMobile,
                     'QUERY-QUEUE',
-                    `聚类已用尽 | 主题="${this.activeMainTopic}" | 已发出=${this.activeClusterIndex}/${this.activeClusterSize}`
+                    `Cluster exhausted | main="${this.activeMainTopic}" | emitted=${this.activeClusterIndex}/${this.activeClusterSize}`
                 )
             }
 
@@ -42,7 +42,7 @@ export class SearchQueryQueue {
                 this.bot.logger.debug(
                     this.bot.isMobile,
                     'QUERY-QUEUE',
-                    `队列已耗尽 | 已见主题=${this.seenTopics.size} | 已见查询=${this.seenQueries.size}`
+                    `Queue exhausted | topicsSeen=${this.seenTopics.size} | queriesSeen=${this.seenQueries.size}`
                 )
                 return null
             }
@@ -65,7 +65,7 @@ export class SearchQueryQueue {
             this.bot.logger.debug(
                 this.bot.isMobile,
                 'QUERY-QUEUE',
-                `聚类已激活 | 主题="${mainTopic}" | 主题序号=${this.topicIndex}/${this.topics.length} | 接收=${cluster.length} | 入队=${this.activeCluster.length} | 跳过已见=${skippedSeen}`
+                `Cluster activated | main="${mainTopic}" | topic=${this.topicIndex}/${this.topics.length} | received=${cluster.length} | queued=${this.activeCluster.length} | skippedSeen=${skippedSeen}`
             )
         }
 
@@ -76,7 +76,7 @@ export class SearchQueryQueue {
         this.bot.logger.debug(
             this.bot.isMobile,
             'QUERY-QUEUE',
-            `出队查询 | 主题="${this.activeMainTopic}" | 查询=${this.activeClusterIndex}/${this.activeClusterSize} | 剩余=${this.activeCluster.length} | 值="${query}"`
+            `Dequeued query | main="${this.activeMainTopic}" | query=${this.activeClusterIndex}/${this.activeClusterSize} | remaining=${this.activeCluster.length} | value="${query}"`
         )
         return query
     }
@@ -104,7 +104,7 @@ export class SearchQueryQueue {
         this.bot.logger.debug(
             this.bot.isMobile,
             'QUERY-QUEUE',
-            `主题池已补充 | 接收=${topics.length} | 入队=${this.topics.length} | 此前已见=${this.seenTopics.size}`
+            `Topic pool refilled | received=${topics.length} | queued=${this.topics.length} | previouslySeen=${this.seenTopics.size}`
         )
         return this.topics.length
     }

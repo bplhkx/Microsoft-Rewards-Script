@@ -30,8 +30,8 @@ export class SearchManager {
         this.bot.logger.info(
             'main',
             'SEARCH-MANAGER',
-            `移动端: ${this.describeQuota(this.bot.config.workers.doMobileSearch, quotas.mobile)}` +
-                ` | 桌面端: ${this.describeQuota(this.bot.config.workers.doDesktopSearch, desktopQuota)}` +
+            `Mobile: ${this.describeQuota(this.bot.config.workers.doMobileSearch, quotas.mobile)}` +
+                ` | Desktop: ${this.describeQuota(this.bot.config.workers.doDesktopSearch, desktopQuota)}` +
                 `${quotas.edge.max > 0 ? ` | Edge: ${quotas.edge.earned}/${quotas.edge.max}` : ''}`
         )
 
@@ -74,7 +74,7 @@ export class SearchManager {
                 this.bot.logger.error(
                     'main',
                     'SEARCH-MANAGER',
-                    `${platform} 搜索失败 | ${error instanceof Error ? error.message : String(error)}`
+                    `${platform} search failed | ${error instanceof Error ? error.message : String(error)}`
                 )
                 return 0
             }
@@ -82,7 +82,7 @@ export class SearchManager {
     }
 
     async bonusMobile(account: Account): Promise<number> {
-        this.bot.logger.info('main', 'SEARCH-MANAGER', '开始奖励搜索')
+        this.bot.logger.info('main', 'SEARCH-MANAGER', 'Starting bonus search farming')
 
         const gained = await executionContext.run({ isMobile: true, account }, async () => {
             try {
@@ -91,7 +91,7 @@ export class SearchManager {
                 this.bot.logger.error(
                     'main',
                     'SEARCH-MANAGER',
-                    `奖励搜索失败 | ${error instanceof Error ? error.message : String(error)}`
+                    `Bonus search failed | ${error instanceof Error ? error.message : String(error)}`
                 )
                 return 0
             } finally {
@@ -104,7 +104,7 @@ export class SearchManager {
         this.bot.logger.info(
             'main',
             'SEARCH-MANAGER',
-            `奖励搜索汇总 | 获得积分=${gained} | 当前余额=${this.bot.userData.currentPoints}`
+            `Bonus search summary | pointsGained=${gained} | currentBalance=${this.bot.userData.currentPoints}`
         )
         return gained
     }

@@ -61,7 +61,7 @@ export class EdgeBrowsing extends BaseActivity {
     public async run(data: DashboardData, signal?: AbortSignal): Promise<void> {
         const accessToken = this.bot.accessToken
         if (!accessToken) {
-            this.bot.logger.warn(this.bot.isMobile, LOG_TAG, '跳过：移动应用访问令牌不可用')
+            this.bot.logger.warn(this.bot.isMobile, LOG_TAG, 'Skipping: mobile app access token is unavailable')
             return
         }
 
@@ -77,7 +77,7 @@ export class EdgeBrowsing extends BaseActivity {
                     this.bot.logger.info(
                         this.bot.isMobile,
                         LOG_TAG,
-                        '该账户无法使用 Edge 浏览连击（Browsing Streak）'
+                        'Browsing Streak on Edge is not available for this account'
                     )
                     return
                 }
@@ -93,7 +93,7 @@ export class EdgeBrowsing extends BaseActivity {
 
             const complete = settings.promotion.attributes['complete']?.toLowerCase() === 'true'
             if (complete) {
-                this.bot.logger.info(this.bot.isMobile, LOG_TAG, 'Edge 浏览连击（Browsing Streak）已完成')
+                this.bot.logger.info(this.bot.isMobile, LOG_TAG, 'Browsing Streak on Edge is already complete')
                 return
             }
 
@@ -117,7 +117,7 @@ export class EdgeBrowsing extends BaseActivity {
             this.bot.logger.info(
                 this.bot.isMobile,
                 LOG_TAG,
-                `开始后台 Edge 浏览活动 | offerId=${settings.offerId} | type=${settings.activityType}` +
+                `Started background Edge browsing activity | offerId=${settings.offerId} | type=${settings.activityType}` +
                     ` | targetMinutes=${TARGET_DURATION_MINUTES} | reports=${reportCount}` +
                     ` | serverIntervalMinutes=${settings.reportIntervalMinutes}` +
                     ` | jitterSeconds=${REPORT_JITTER_MIN_MS / 1000}-${REPORT_JITTER_MAX_MS / 1000}` +
@@ -134,7 +134,7 @@ export class EdgeBrowsing extends BaseActivity {
                 )
 
                 if (!(await this.wait(progress.delayBeforeReport(reportNumber), signal))) {
-                    this.bot.logger.debug(this.bot.isMobile, LOG_TAG, '后台活动已取消')
+                    this.bot.logger.debug(this.bot.isMobile, LOG_TAG, 'Background activity cancelled')
                     return
                 }
 
@@ -147,7 +147,7 @@ export class EdgeBrowsing extends BaseActivity {
                     this.bot.logger.warn(
                         this.bot.isMobile,
                         LOG_TAG,
-                        `Edge 浏览报告提交失败 | report=${reportNumber}/${reportCount}` +
+                        `Edge browsing report failed | report=${reportNumber}/${reportCount}` +
                             ` | status=${status ?? 'unknown'}` +
                             ` | message=${error instanceof Error ? error.message : String(error)}`
                     )
@@ -179,7 +179,7 @@ export class EdgeBrowsing extends BaseActivity {
 
                 const afterReport = progress.snapshot(reportNumber)
                 const message =
-                    `已提交 Edge 浏览报告 | report=${reportNumber}/${reportCount} | status=${result.status}` +
+                    `Submitted Edge browsing report | report=${reportNumber}/${reportCount} | status=${result.status}` +
                     ` | duplicate=${result.duplicate}` +
                     ` | cookies=${result.cookieNames.join(',') || 'none'}` +
                     ` | reportsRemaining=${afterReport.reportsRemaining}` +
@@ -204,7 +204,7 @@ export class EdgeBrowsing extends BaseActivity {
 
             const finished = progress.snapshot(reportsProcessed)
             const summary =
-                `后台 Edge 浏览活动结束 | reports=${reportsProcessed}` +
+                `Finished background Edge browsing activity | reports=${reportsProcessed}` +
                 ` | reportsCompleted=${reportsProcessed}/${reportCount}` +
                 ` | reportsRemaining=${serverComplete ? 0 : finished.reportsRemaining}` +
                 ` | scheduledMinutesCovered=${finished.scheduledMinutesCovered}/${TARGET_DURATION_MINUTES}` +
@@ -221,14 +221,14 @@ export class EdgeBrowsing extends BaseActivity {
             }
         } catch (error) {
             if (signal?.aborted) {
-                this.bot.logger.debug(this.bot.isMobile, LOG_TAG, '后台活动已取消')
+                this.bot.logger.debug(this.bot.isMobile, LOG_TAG, 'Background activity cancelled')
                 return
             }
 
             this.bot.logger.error(
                 this.bot.isMobile,
                 LOG_TAG,
-                `后台 Edge 浏览活动失败 | message=${
+                `Background Edge browsing activity failed | message=${
                     error instanceof Error ? error.message : String(error)
                 }`
             )
@@ -605,7 +605,7 @@ export class EdgeBrowsing extends BaseActivity {
                 this.bot.logger.debug(
                     this.bot.isMobile,
                     LOG_TAG,
-                    `无法验证 Edge 浏览完成状态：优惠不存在 | report=${reportNumber}/${reportCount}`
+                    `Could not verify Edge browsing completion: promotion is absent | report=${reportNumber}/${reportCount}`
                 )
                 return false
             }
@@ -614,14 +614,14 @@ export class EdgeBrowsing extends BaseActivity {
             this.bot.logger.debug(
                 this.bot.isMobile,
                 LOG_TAG,
-                `已刷新 Edge 浏览服务器状态 | report=${reportNumber}/${reportCount} | complete=${complete}`
+                `Refreshed Edge browsing server state | report=${reportNumber}/${reportCount} | complete=${complete}`
             )
             return complete
         } catch (error) {
             this.bot.logger.debug(
                 this.bot.isMobile,
                 LOG_TAG,
-                `无法刷新 Edge 浏览服务器状态 | report=${reportNumber}/${reportCount}` +
+                `Could not refresh Edge browsing server state | report=${reportNumber}/${reportCount}` +
                     ` | message=${error instanceof Error ? error.message : String(error)}`
             )
             return false
@@ -638,7 +638,7 @@ export class EdgeBrowsing extends BaseActivity {
         this.bot.logger.info(
             this.bot.isMobile,
             LOG_TAG,
-            `Microsoft 已确认 Edge 浏览活动完成 | report=${reportNumber}/${reportCount}` +
+            `Microsoft reports Edge browsing activity complete | report=${reportNumber}/${reportCount}` +
                 ` | accepted=${acceptedReports} | duplicates=${duplicateReports} | failed=${failedReports}`,
             'green'
         )
@@ -661,7 +661,7 @@ export class EdgeBrowsing extends BaseActivity {
             this.bot.logger.warn(
                 this.bot.isMobile,
                 LOG_TAG,
-                `跳过：优惠元数据不完整 | offerId=${offerId || 'missing'}` +
+                `Skipping: promotion metadata is incomplete | offerId=${offerId || 'missing'}` +
                     ` | type=${activityType || 'missing'}`
             )
             return null
@@ -678,7 +678,7 @@ export class EdgeBrowsing extends BaseActivity {
             this.bot.logger.warn(
                 this.bot.isMobile,
                 LOG_TAG,
-                `服务器上报间隔无效，使用回退值 | received=${
+                `Invalid server report interval; using fallback | received=${
                     promotion.attributes['report_per_minutes'] ?? 'missing'
                 } | fallbackMinutes=${DEFAULT_REPORT_INTERVAL_MINUTES}`
             )
@@ -728,7 +728,7 @@ export class EdgeBrowsing extends BaseActivity {
         this.bot.logger.debug(
             this.bot.isMobile,
             LOG_TAG,
-            `Edge 活动响应 | offerId=${activity?.a?.offerid ?? 'unknown'}` +
+            `Edge activity response | offerId=${activity?.a?.offerid ?? 'unknown'}` +
                 ` | type=${activity?.type ?? 'unknown'} | quantity=${activity?.q ?? 'unknown'}`
         )
 
@@ -798,7 +798,7 @@ export class EdgeBrowsing extends BaseActivity {
         failedReports: number
     ): string {
         return (
-            `Edge 浏览进度 | reportsCompleted=${progress.reportsCompleted}/${progress.reportsTotal}` +
+            `Edge browsing progress | reportsCompleted=${progress.reportsCompleted}/${progress.reportsTotal}` +
             ` | reportsRemaining=${progress.reportsRemaining}` +
             ` | scheduledMinutesCovered=${progress.scheduledMinutesCovered}/${TARGET_DURATION_MINUTES}` +
             `${progress.nextReportInSeconds === null ? '' : ` | nextReportInSeconds=${progress.nextReportInSeconds}`}` +

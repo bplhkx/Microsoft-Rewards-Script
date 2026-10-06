@@ -177,7 +177,7 @@ export class UserAgentManager {
             this.bot.logger.warn(
                 isMobile,
                 'USERAGENT-CHROME-VERSION',
-                `版本查询不可用 (${error instanceof Error ? error.message : String(error)})；使用内置回退版本 ${fallback}`
+                `Version lookup unavailable (${error instanceof Error ? error.message : String(error)}); using bundled fallback ${fallback}`
             )
             return fallback
         }
@@ -219,7 +219,7 @@ export class UserAgentManager {
             this.bot.logger.warn(
                 isMobile,
                 'USERAGENT-EDGE-VERSION',
-                `版本查询不可用 (${error instanceof Error ? error.message : String(error)})；使用内置回退版本 Android ${fallback.android}，桌面版 ${fallback.windows}`
+                `Version lookup unavailable (${error instanceof Error ? error.message : String(error)}); using bundled fallbacks Android ${fallback.android}, Desktop ${fallback.windows}`
             )
             return { android: fallback.android, desktop: fallback.windows }
         }
@@ -306,7 +306,7 @@ export class UserAgentManager {
             this.bot.logger.error(
                 isMobile,
                 'USER-AGENT-UPDATE',
-                `发生错误: ${error instanceof Error ? error.message : String(error)}`
+                `An error occurred: ${error instanceof Error ? error.message : String(error)}`
             )
             throw error
         }
