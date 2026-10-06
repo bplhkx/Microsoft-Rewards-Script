@@ -49,9 +49,13 @@ export default class BrowserFunc {
                         retries: 0
                     })
 
-                    await this.applyResponseCookies(URLs.rewards.userInfoApi, response.headers['set-cookie'])
-
+                    // deploy:cookie-guard - an unauthenticated hit on this endpoint answers
+                    // 302 -> /Signin *and* sets a fresh logged-out _C_Auth. Writing that back
+                    // used to destroy the portal session stored in the jar, so each failed
+                    // attempt made the next one less likely to be recognised. Only persist
+                    // cookies from a response that actually carried dashboard data.
                     if (response.data?.dashboard) {
+                        await this.applyResponseCookies(URLs.rewards.userInfoApi, response.headers['set-cookie'])
                         this.logBotDetectionMetrics(response.data)
                         return response.data
                     }
@@ -165,10 +169,21 @@ export default class BrowserFunc {
             const response = await this.bot.http.request(request)
             return response.data as AppDashboardData
         } catch (error) {
+            // deploy:app-401-detail - "Request failed with status code 401" told us nothing.
+            // Print the response body and the request context (never the token itself) so the
+            // next run explains why the Rewards platform rejected the mobile access token.
+            const ax = error as { response?: { status?: number; statusText?: string; data?: unknown } }
+            const body =
+                typeof ax.response?.data === 'string'
+                    ? (ax.response.data as string).slice(0, 200)
+                    : JSON.stringify(ax.response?.data ?? {}).slice(0, 200)
+            const detail = ax.response
+                ? `status=${ax.response.status} ${ax.response.statusText ?? ''}`.trim() + ` | body=${body}`
+                : `message=${error instanceof Error ? error.message : String(error)}`
             this.bot.logger.error(
                 this.bot.isMobile,
                 'GET-APP-DASHBOARD-DATA',
-                `Error fetching dashboard data: ${error instanceof Error ? error.message : String(error)}`
+                `Error fetching dashboard data: ${detail} | token=${this.bot.accessToken ? `present len=${this.bot.accessToken.length}` : 'EMPTY'} | country=${this.bot.userData.geoLocale} | lang=${this.bot.userData.langCode}`
             )
             throw error
         }
