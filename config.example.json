@@ -13,6 +13,10 @@
         "min": "1min",
         "max": "3min"
     },
+    "workerGap": {
+        "min": "1min",
+        "max": "4min"
+    },
     "workers": {
         "doDailySet": true,
         "doClaimBonusPoints": true,

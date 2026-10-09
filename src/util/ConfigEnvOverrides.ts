@@ -22,6 +22,8 @@ export const ENV_OVERRIDES: EnvOverrideEntry[] = [
     { env: 'CONFIG_GLOBAL_TIMEOUT', path: 'globalTimeout', type: 'string' },
     { env: 'CONFIG_ACCOUNT_DELAY_MIN', path: 'accountDelay.min', type: 'string' },
     { env: 'CONFIG_ACCOUNT_DELAY_MAX', path: 'accountDelay.max', type: 'string' },
+    { env: 'CONFIG_WORKER_GAP_MIN', path: 'workerGap.min', type: 'string' },
+    { env: 'CONFIG_WORKER_GAP_MAX', path: 'workerGap.max', type: 'string' },
 
     // Workers
     { env: 'CONFIG_WORKER_DAILY_SET', path: 'workers.doDailySet', type: 'bool' },

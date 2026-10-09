@@ -12,6 +12,7 @@ export interface Config {
     skipNonPointTasks: boolean
     prewarmDesktopLogin: boolean
     accountDelay: ConfigDelay
+    workerGap: ConfigDelay
     workers: ConfigWorkers
     activities: ConfigActivities
     searchOnBingLocalQueries: boolean

@@ -656,8 +656,10 @@ export class MicrosoftRewardsBot {
     }
 
     private async gapBetweenWorkers(): Promise<void> {
-        const delayMs = this.utils.randomDelay(60000, 240000)
-        this.logger.debug(this.isMobile, 'FLOW', `大任务间隔等待 | ${Math.round(delayMs / 1000)}秒`)
+        // deploy:worker-gap - was hardcoded to 60-240s; now searchSettings-style config
+        const { min, max } = this.config.workerGap
+        const delayMs = this.utils.randomDelay(min, max)
+        this.logger.debug(this.isMobile, 'FLOW', `Worker gap | ${(delayMs / 1000).toFixed(0)}s`)
         await this.utils.wait(delayMs)
     }
 

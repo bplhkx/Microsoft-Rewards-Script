@@ -147,6 +147,7 @@ export const ConfigSchema = z.object({
     skipNonPointTasks: z.boolean().default(true),
     prewarmDesktopLogin: z.boolean().default(false),
     accountDelay: DelaySchema.default({ min: '1min', max: '3min' }),
+    workerGap: DelaySchema.default({ min: '1min', max: '4min' }),
     workers: z.object({
         doDailySet: z.boolean(),
         doMorePromotions: z.boolean(),
@@ -299,6 +300,7 @@ const defaultConfig: Config = {
     skipNonPointTasks: true,
     prewarmDesktopLogin: false,
     accountDelay: { min: '1min', max: '3min' },
+    workerGap: { min: '1min', max: '4min' },
     workers: {
         doDailySet: true,
         doMorePromotions: true,
