@@ -28,7 +28,8 @@ import type { Account } from './interface/Account'
 import HttpClient from './util/Http'
 import { sendDiscord, flushDiscordQueue } from './logging/Discord'
 import { sendNtfy, flushNtfyQueue } from './logging/Ntfy'
-import { sendTelegram, flushTelegramQueue } from './logging/Telegram'
+import { sendTelegram, flushTelegramQueue, sendTelegramPlain } from './logging/Telegram'
+import { buildTelegramRunSummary } from './logging/RunSummaryText'
 import { sendPushPlus, flushPushPlusQueue } from './logging/PushPlus'
 import { sendServerChan, flushServerChanQueue } from './logging/ServerChan'
 import { sendClawBot, flushClawBotQueue, ensureClawBotReady } from './logging/ClawBot'
@@ -392,6 +393,7 @@ export class MicrosoftRewardsBot {
                 await this.sendPushPlusSummary(allAccountStats, runStartTime, hadWorkerFailure)
                 await this.sendServerChanSummary(allAccountStats, runStartTime, hadWorkerFailure)
                 await this.sendClawBotSummary(allAccountStats, runStartTime, hadWorkerFailure)
+                await this.sendTelegramSummary(allAccountStats, runStartTime, hadWorkerFailure)
                 await flushAllWebhooks()
 
                 if (!hadWorkerFailure) markRunSucceeded()
@@ -471,6 +473,20 @@ export class MicrosoftRewardsBot {
         }
 
         return lines.join('\n')
+    }
+
+    private async sendTelegramSummary(
+        accountStats: AccountStats[],
+        runStartTime: number,
+        hadWorkerFailure: boolean
+    ): Promise<void> {
+        const telegram = this.config?.webhook?.telegram
+        if (!telegram?.enabled || !telegram.botToken || !telegram.chatId) {
+            return
+        }
+
+        const content = buildTelegramRunSummary(accountStats, runStartTime, hadWorkerFailure)
+        await sendTelegramPlain(telegram, content)
     }
 
     private async sendPushPlusSummary(
