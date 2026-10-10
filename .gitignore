@@ -22,3 +22,8 @@ note
 /.zcode/
 /scripts/tests
 /docs
+
+# 部署时手改出来的备份，里面是 .env/config.json 的旧值（含 token），永远不进仓库
+.env.bak*
+*.bak-*
+config.json.bak*
