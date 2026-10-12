@@ -404,6 +404,15 @@ export default class ReactFunc {
                 `Parsed streaks | ${unique.map(s => `${s.partner}:${s.completedDays}/${s.totalDays}`).join(', ') || 'none'}`
             )
 
+            // 连续打卡的真实进度在这里已经是结构化的了（completedDays/totalDays、
+            // activitiesCompleted/activitiesTotal）。debug 行面板不会入库（generic 只留
+            // warn/error），所以再补一行 CHECKIN-PROGRESS，让面板按 streak-<partner> /
+            // tasks-<partner> 记账，App 那三行就能显示真进度而不是"连续得分天数"的近似值。
+            const progress = this.streakProgressParts(unique)
+            if (progress.length) {
+                this.bot.logger.info(this.bot.isMobile, 'CHECKIN-PROGRESS', progress.join(' | '))
+            }
+
             return unique
         } catch (error) {
             this.bot.logger.error(
@@ -413,6 +422,32 @@ export default class ReactFunc {
             )
             return []
         }
+    }
+
+    /**
+     * 把 streak 卡的结构化进度拼成 CHECKIN-PROGRESS 的参数：
+     *   streak-bing=3/14 | tasks-bing=2/4
+     * partner 有时是 URL 或带空格的显示名，所以统一 slug 化并截短；
+     * 界面按关键字（bing / mobile / daily…）归类，不依赖完整名字。
+     */
+    private streakProgressParts(streaks: StreakState[]): string[] {
+        const parts: string[] = []
+        for (const s of streaks) {
+            const slug =
+                String(s.partner ?? '')
+                    .toLowerCase()
+                    .replace(/^https?:\/\//, '')
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-+|-+$/g, '')
+                    .slice(0, 24) || 'unknown'
+            if (s.totalDays > 0 && s.completedDays <= s.totalDays) {
+                parts.push(`streak-${slug}=${s.completedDays}/${s.totalDays}`)
+            }
+            if (s.activitiesTotal > 0 && s.activitiesCompleted <= s.activitiesTotal) {
+                parts.push(`tasks-${slug}=${s.activitiesCompleted}/${s.activitiesTotal}`)
+            }
+        }
+        return parts
     }
 
     private parseStreakProtection(combined: string): StreakProtectionState | null {
