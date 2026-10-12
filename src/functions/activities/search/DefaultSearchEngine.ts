@@ -7,6 +7,8 @@ import { BaseActivity } from '../BaseActivity'
 import { SearchQueryQueue } from '../../SearchQueryQueue'
 
 const LOG_TAG = 'DEFAULT-SEARCH-ENGINE'
+// 其它升级活动的天数走这个标签，面板按 title 分派捕获规则
+const PROGRESS_TAG = 'CHECKIN-PROGRESS'
 const LEVEL_INFO_PROMOTION = 'level_info'
 
 const MAX_ATTEMPTS = 3
@@ -140,11 +142,34 @@ export class DefaultSearchEngine extends BaseActivity {
         )?.attributes
         if (!attributes) return null
 
+        this.logLevelInfoProgress(attributes)
+
         const days = Number(attributes['hva_dse_days'])
         const daysMax = Number(attributes['hva_dse_days_max'])
         if (!Number.isFinite(days) || !Number.isFinite(daysMax) || daysMax <= 0) return null
 
         return { days, daysMax, source: 'app' }
+    }
+
+    /**
+     * level_info 里其实躺着所有升级活动的天数（默认搜索引擎、每日活动、必应 App 签到…），
+     * 但机器人只为默认搜索引擎这一项打日志，其它项面板就看不见。
+     * 这里把形如 hva_<name>_days / hva_<name>_days_max 的成对属性拼成一行
+     * `CHECKIN-PROGRESS | dse=3/14 | dailyset=2/4`，面板按 key 取用，
+     * 微软以后加新活动也不用再改这里。
+     */
+    private logLevelInfoProgress(attributes: Record<string, string | undefined>): void {
+        const parts: string[] = []
+        for (const [key, raw] of Object.entries(attributes)) {
+            if (!/^hva_/i.test(key) || !key.endsWith('_days') || raw === undefined) continue
+            const base = key.slice(0, -'_days'.length)
+            const days = Number(raw)
+            const daysMax = Number(attributes[`${base}_days_max`] ?? attributes[`${base}_max`])
+            if (!Number.isFinite(days) || !Number.isFinite(daysMax) || daysMax <= 0 || days > daysMax) continue
+            parts.push(`${base.replace(/^hva_/i, '')}=${days}/${daysMax}`)
+        }
+        if (!parts.length) return
+        this.bot.logger.info(this.bot.isMobile, PROGRESS_TAG, parts.join(' | '))
     }
 
     private fromWebDashboard(data: DashboardData): DefaultSearchEngineState | null {
