@@ -170,11 +170,17 @@ export default class BrowserFunc {
                 const res = (error as { response?: HttpResponse<T> })?.response
                 const authInfo = String(res?.headers?.['x-auth-info'] ?? '')
                 const notReady = res?.status === 401 && /not initialized/i.test(authInfo)
-                if (!notReady || attempt >= attempts) throw error
+                // The prod edge also answers 502/503/504 when a backend is momentarily
+                // unhealthy. Those are transient, so retry them on a fresh connection too;
+                // the default-search-engine activity reads its progress from this endpoint.
+                const transientGateway =
+                    res?.status === 502 || res?.status === 503 || res?.status === 504
+                if ((!notReady && !transientGateway) || attempt >= attempts) throw error
                 this.bot.logger.debug(
                     this.bot.isMobile,
                     source,
-                    `RPS 尚未就绪，换新连接重试 ${attempt}/${attempts} | x-auth-info=${authInfo}`
+                    `RPS 暂时不可用，换新连接重试 ${attempt}/${attempts} | status=${res?.status ?? 'n/a'}` +
+                        ` | x-auth-info=${authInfo}`
                 )
                 await new Promise(resolve => setTimeout(resolve, 250 * attempt))
             }

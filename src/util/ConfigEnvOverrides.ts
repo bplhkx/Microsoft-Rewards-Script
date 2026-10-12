@@ -38,6 +38,7 @@ export const ENV_OVERRIDES: EnvOverrideEntry[] = [
     { env: 'CONFIG_WORKER_READ_TO_EARN', path: 'workers.doReadToEarn', type: 'bool' },
     { env: 'CONFIG_WORKER_ACTIVATE_SEARCH_PERK', path: 'workers.doActivateSearchPerk', type: 'bool' },
     { env: 'CONFIG_WORKER_VISUAL_SEARCH', path: 'workers.doVisualSearch', type: 'bool' },
+    { env: 'CONFIG_WORKER_DEFAULT_SEARCH_ENGINE', path: 'workers.doDefaultSearchEngine', type: 'bool' },
 
     // Search settings
     { env: 'CONFIG_SEARCH_SCROLL_RANDOM', path: 'searchSettings.scrollRandomResults', type: 'bool' },

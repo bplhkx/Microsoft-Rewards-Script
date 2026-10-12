@@ -22,6 +22,8 @@ import { SearchOnBing as BrowserSearchOnBing } from './activities/search/Browser
 import { ApiSearch } from './activities/experimental/ApiSearch'
 import { ApiSearchOnBing } from './activities/experimental/ApiSearchOnBing'
 import { EdgeBrowsing } from './activities/experimental/EdgeBrowsing'
+import { DefaultSearchEngine } from './activities/search/DefaultSearchEngine'
+import type { DefaultSearchEngineState } from './activities/search/DefaultSearchEngine'
 
 import type { Page } from 'patchright'
 import type { BasePromotion, DashboardData } from '../interface/DashboardData'
@@ -125,5 +127,17 @@ export default class Activities {
     doEdgeBrowsing = async (data: DashboardData, signal?: AbortSignal): Promise<void> => {
         const edgeBrowsing = new EdgeBrowsing(this.bot)
         await edgeBrowsing.run(data, signal)
+    }
+
+    getDefaultSearchEngineState = (data: DashboardData, appData: AppDashboardData | null): DefaultSearchEngineState | null => {
+        return new DefaultSearchEngine(this.bot).resolveState(data, appData)
+    }
+
+    doDefaultSearchEngine = async (
+        page: Page,
+        data: DashboardData,
+        appData: AppDashboardData | null
+    ): Promise<void> => {
+        await new DefaultSearchEngine(this.bot).run(page, data, appData)
     }
 }

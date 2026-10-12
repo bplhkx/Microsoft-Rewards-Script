@@ -713,6 +713,36 @@ export class MicrosoftRewardsBot {
         return session
     }
 
+    /**
+     * Cheap pre-check so an account only pays for a desktop browser session when
+     * the "set Bing as the default search engine" activity still has days left.
+     */
+    private isDefaultSearchEngineDue(data: DashboardData, appData: AppDashboardData | null): boolean {
+        if (!this.config.workers.doDefaultSearchEngine) return false
+
+        const state = this.activities.getDefaultSearchEngineState(data, appData)
+        if (!state) {
+            this.logger.debug(
+                'main',
+                'DEFAULT-SEARCH-ENGINE',
+                '仪表板未提供默认搜索引擎活动进度，跳过该活动'
+            )
+            return false
+        }
+
+        return state.days < state.daysMax
+    }
+
+    private async runDefaultSearchEngine(data: DashboardData, appData: AppDashboardData | null): Promise<void> {
+        if (!this.mainDesktopPage) {
+            this.logger.warn('main', 'DEFAULT-SEARCH-ENGINE', '桌面页面不可用，无法执行默认搜索引擎打卡')
+            return
+        }
+
+        await this.activities.doDefaultSearchEngine(this.mainDesktopPage, data, appData)
+        await this.gapBetweenWorkers()
+    }
+
     async Main(account: Account): Promise<AccountRunResult> {
         const accountEmail = account.email
         this.logger.info('main', 'FLOW', `Starting session for ${accountEmail}`)
@@ -731,7 +761,8 @@ export class MicrosoftRewardsBot {
         const needsAppActivities =
             this.config.workers.doDailyCheckIn ||
             this.config.workers.doAppPromotions ||
-            this.config.workers.doReadToEarn
+            this.config.workers.doReadToEarn ||
+            this.config.workers.doDefaultSearchEngine
         const needsAppAccessToken = this.config.experimental.edgeBrowsing || needsAppActivities
 
         let mobileSession: BrowserSession | null = null
@@ -795,7 +826,8 @@ export class MicrosoftRewardsBot {
                     this.config.prewarmDesktopLogin &&
                     (this.config.workers.doPunchCards ||
                         this.config.workers.doVisualSearch ||
-                        (this.config.workers.doDesktopSearch && !apiSearch))
+                        (this.config.workers.doDesktopSearch && !apiSearch) ||
+                        this.config.workers.doDefaultSearchEngine)
 
                 if (prewarmDesktop) {
                     try {
@@ -970,7 +1002,13 @@ export class MicrosoftRewardsBot {
                     const plan = await this.searchManager.getSearchPoints()
                     const doMobileSearch = plan.doMobile
                     const doDesktopSearch = plan.doDesktop
-                    const desktopBrowserNeeded = this.config.workers.doPunchCards || doVisualSearch
+                    const dseNeeded = this.isDefaultSearchEngineDue(data, appData)
+                    // A desktop session opened purely for the default-search-engine
+                    // activity must not be able to abort the rest of the account run.
+                    const dseOnlyDesktopReason =
+                        dseNeeded && !this.config.workers.doPunchCards && !doVisualSearch
+                    const desktopBrowserNeeded =
+                        this.config.workers.doPunchCards || doVisualSearch || dseNeeded
 
                     if (doDesktopSearch && !desktopBrowserNeeded) {
                         this.cookies.desktop = [...this.cookies.mobile]
@@ -978,11 +1016,24 @@ export class MicrosoftRewardsBot {
                     }
 
                     if (desktopBrowserNeeded) {
-                        await executionContext.run({ isMobile: false, account }, async () => {
-                            desktopSession = await this.createDesktopSession(account)
-                            if (this.config.workers.doPunchCards) await this.activities.doPunchCardsDesktop()
-                            if (doVisualSearch) await this.activities.doVisualSearch(data)
-                        })
+                        try {
+                            await executionContext.run({ isMobile: false, account }, async () => {
+                                desktopSession = await this.createDesktopSession(account)
+                                if (this.config.workers.doPunchCards)
+                                    await this.activities.doPunchCardsDesktop()
+                                if (doVisualSearch) await this.activities.doVisualSearch(data)
+                                if (dseNeeded) await this.runDefaultSearchEngine(data, appData)
+                            })
+                        } catch (error) {
+                            if (!dseOnlyDesktopReason) throw error
+                            this.logger.warn(
+                                'main',
+                                'DEFAULT-SEARCH-ENGINE',
+                                `桌面会话仅为默认搜索引擎打卡而创建，失败已忽略 | ${
+                                    error instanceof Error ? error.message : String(error)
+                                }`
+                            )
+                        }
                         await closeDesktopSession()
                     }
 
@@ -1047,8 +1098,11 @@ export class MicrosoftRewardsBot {
                     const doMobileSearch = plan.doMobile
                     const doDesktopSearch = plan.doDesktop
 
-                    const desktopBrowserNeeded =
+                    const dseNeeded = this.isDefaultSearchEngineDue(data, appData)
+                    const desktopNeededForOtherWorkers =
                         this.config.workers.doPunchCards || doVisualSearch || (doDesktopSearch && !apiSearch)
+                    const desktopBrowserNeeded =
+                        desktopNeededForOtherWorkers || dseNeeded
 
                     if (apiSearch && doDesktopSearch && !desktopBrowserNeeded) {
                         this.cookies.desktop = [...this.cookies.mobile]
@@ -1060,6 +1114,7 @@ export class MicrosoftRewardsBot {
                             desktopSession = await this.createDesktopSession(account)
                             if (this.config.workers.doPunchCards) await this.activities.doPunchCardsDesktop()
                             if (doVisualSearch) await this.activities.doVisualSearch(data)
+                            if (dseNeeded) await this.runDefaultSearchEngine(data, appData)
                         })
 
                         const mobileWork = async (): Promise<[number, number]> => {
@@ -1089,15 +1144,28 @@ export class MicrosoftRewardsBot {
                         if (!apiSearch) await closeMobileSession()
 
                         if (desktopBrowserNeeded) {
-                            await executionContext.run({ isMobile: false, account }, async () => {
-                                desktopSession = await this.createDesktopSession(account)
+                            try {
+                                await executionContext.run({ isMobile: false, account }, async () => {
+                                    desktopSession = await this.createDesktopSession(account)
 
-                                if (this.config.workers.doPunchCards) await this.activities.doPunchCardsDesktop()
-                                if (doVisualSearch) await this.activities.doVisualSearch(data)
-                                if (doDesktopSearch && !apiSearch) {
-                                    desktopPoints = await this.searchManager.searchDesktop(account)
-                                }
-                            })
+                                    if (this.config.workers.doPunchCards)
+                                        await this.activities.doPunchCardsDesktop()
+                                    if (doVisualSearch) await this.activities.doVisualSearch(data)
+                                    if (dseNeeded) await this.runDefaultSearchEngine(data, appData)
+                                    if (doDesktopSearch && !apiSearch) {
+                                        desktopPoints = await this.searchManager.searchDesktop(account)
+                                    }
+                                })
+                            } catch (error) {
+                                if (desktopNeededForOtherWorkers) throw error
+                                this.logger.warn(
+                                    'main',
+                                    'DEFAULT-SEARCH-ENGINE',
+                                    `桌面会话仅为默认搜索引擎打卡而创建，失败已忽略 | ${
+                                        error instanceof Error ? error.message : String(error)
+                                    }`
+                                )
+                            }
                             await closeDesktopSession()
                         }
 

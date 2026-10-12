@@ -52,7 +52,11 @@ export const URLs = {
         origin: BING,
         rewardsFlyoutUserInfo: `${BING}/rewards/panelflyout/getuserinfo?channel=BingFlyout&partnerId=BingRewards`,
         search: (query: string, cvid: string) =>
-            `${BING}/search?q=${encodeURIComponent(query)}&PC=U531&FORM=ANNTA1&cvid=${cvid}`
+            `${BING}/search?q=${encodeURIComponent(query)}&PC=U531&FORM=ANNTA1&cvid=${cvid}`,
+        // Chrome's default-provider search template for Bing. Microsoft Rewards
+        // credits the "set Bing as default search engine" activity for searches
+        // that arrive with this form code.
+        dseSearch: (query: string) => `${BING}/search?q=${encodeURIComponent(query)}&PC=U316&FORM=CHROMN`
     },
     edge: {
         products: `${EDGE}/api/products`

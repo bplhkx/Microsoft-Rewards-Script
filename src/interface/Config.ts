@@ -100,6 +100,7 @@ export interface ConfigWorkers {
     doReadToEarn: boolean
     doActivateSearchPerk: boolean
     doVisualSearch: boolean
+    doDefaultSearchEngine: boolean
 }
 
 export interface ConfigActivities {

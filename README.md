@@ -68,6 +68,7 @@
 - ✅ 加成搜索（超过上限后继续刷，可选）
 - ✅ 每日集 / 更多促销 / 打卡 / App 活动 / 每日签到 / 阅读赚取（Read-to-Earn）
 - ✅ 搜索加成 perk 激活（"再搜 N 次得积分"）/ 视觉搜索（可选）
+- ✅ 默认搜索引擎打卡（"将 Bing 设为默认搜索引擎"14 天活动，可选）
 - ✅ 连击保护 & 自动领取 dashboard 奖励积分
 - ✅ 模拟滚动与随机点击，降低风控风险
 
@@ -302,6 +303,7 @@ docker compose restart          # 重启（不重建）
 | `workers.doReadToEarn`         | 完成阅读赚取（Read-to-Earn） | `true`  | `CONFIG_WORKER_READ_TO_EARN`         |
 | `workers.doActivateSearchPerk` | 激活"再搜 N 次"加成 perk     | `true`  | `CONFIG_WORKER_ACTIVATE_SEARCH_PERK` |
 | `workers.doVisualSearch`       | 视觉搜索连击与搜索           | `false` | `CONFIG_WORKER_VISUAL_SEARCH`        |
+| `workers.doDefaultSearchEngine` | 默认搜索引擎打卡（14 天）    | `false` | `CONFIG_WORKER_DEFAULT_SEARCH_ENGINE` |
 
 | 设置（activities）        | 描述                    | 默认值 | Docker 环境变量                  |
 | ------------------------- | ----------------------- | ------ | -------------------------------- |
