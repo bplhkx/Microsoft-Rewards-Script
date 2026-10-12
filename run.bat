@@ -3,4 +3,5 @@
 chcp 65001 >nul
 %~d0
 cd %~dp0
+set TZ=Asia/Shanghai
 call npm start
