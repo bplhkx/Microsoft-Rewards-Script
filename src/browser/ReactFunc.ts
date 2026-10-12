@@ -32,10 +32,14 @@ export interface ParentQuest {
     title: string
     pointProgressMax: number
     complete: boolean
+    /** 页面里那句 "3 / 12 tasks" —— 印章收集的真实进度，不是分数 */
+    tasksDone: number | null
+    tasksMax: number | null
 }
 
 export interface StreakState {
     partner: string
+
     activitiesCompleted: number
     activitiesTotal: number
     completedDays: number
@@ -730,8 +734,14 @@ export default class ReactFunc {
 
                 const pointsMatch = region.match(/\["\+","([\d,]+)"\]/)
                 const points = pointsMatch ? Number(pointsMatch[1]!.replace(/,/g, '')) : 0
-                const taskM = region.match(/(\d+)\s*\/\s*(\d+)\s*tasks/)
-                const complete = !!taskM && Number(taskM[1]) >= Number(taskM[2]!) && Number(taskM[2]) > 0
+                // 印章收集的进度文本。中文界面是 "3 / 12 个任务"，英文是 "3 / 12 tasks"，
+                // 而 Next.js 的 flight 数组常把数字和文字切成相邻的两段（["3 / 12","个任务"]），
+                // 所以中间允许最多 12 个非数字字符；再兜一层：这段里出现了"任务/tasks"，
+                // 就取第一个分母不超过 40 的 n/m（分数、积分那种大分母不会误伤）。
+                const tasks = this.parseTaskProgress(region)
+                const tasksDone = tasks?.done ?? null
+                const tasksMax = tasks?.max ?? null
+                const complete = !!tasks && tasks.done >= tasks.max
 
                 // First wins for title/points
                 const prev = byId.get(id)
@@ -739,20 +749,32 @@ export default class ReactFunc {
                     offerId: id,
                     title: prev?.title || title,
                     pointProgressMax: prev?.pointProgressMax || points,
-                    complete: prev?.complete || complete
+                    complete: prev?.complete || complete,
+                    // 同一个 parent 会在多个 Suspense 块里出现，带 tasks 的那块不一定先到：
+                    // 谁先给出非空进度就用谁
+                    tasksDone: prev?.tasksDone ?? tasksDone,
+                    tasksMax: prev?.tasksMax ?? tasksMax
                 })
             }
 
             const out = [...byId.values()]
+            // 印章收集的真实进度是页面里那句 "3 / 12 tasks"。以前只拿它判 complete，
+            // 数字当场丢掉，面板就只能显示"几张卡、几张没完成"。这里报"正在集的那张"：
+            // 第一张未完成的卡；都完成了就报格子最多的那张。
+            const withTasks = out.filter(q => (q.tasksMax ?? 0) > 0)
+            const active =
+                withTasks.find(q => !q.complete) ??
+                [...withTasks].sort((a, b) => (b.tasksMax ?? 0) - (a.tasksMax ?? 0))[0]
+            const stamps = active?.tasksMax ? ` | stamps=${active.tasksDone ?? 0}/${active.tasksMax}` : ''
             this.bot.logger.info(
                 this.bot.isMobile,
                 'REACT-PARSE',
-                `Quest list | parents=${out.length} | incomplete=${out.filter(q => !q.complete).length}`
+                `Quest list | parents=${out.length} | incomplete=${out.filter(q => !q.complete).length}${stamps}`
             )
             this.bot.logger.debug(
                 this.bot.isMobile,
                 'REACT-PARSE',
-                `Quest points | ${out.map(q => `${q.title || q.offerId}=${q.pointProgressMax}`).join(' | ') || 'none'}`
+                `Quest points | ${out.map(q => `${q.title || q.offerId}=${q.pointProgressMax}${q.tasksMax ? ` (${q.tasksDone ?? 0}/${q.tasksMax} 任务)` : ' (没解析到任务进度)'}`).join(' | ') || 'none'}`
             )
             if (!out.length) {
                 this.bot.logger.warn(
@@ -773,6 +795,30 @@ export default class ReactFunc {
     }
 
     // <campaign>_pcparent_<name>_punchcard
+    /**
+     * 从一张印章卡的文本块里取 "已完成 / 总数" 的进度。
+     * 见调用处的注释：中英语言、flight 分段都要吃到，且不能把积分那种大数字当进度。
+     */
+    private parseTaskProgress(region: string): { done: number; max: number } | null {
+        const word = '(?:tasks?|quests?|个任务|個任務|项任务|項任務|任务|印章|stamps?)'
+        const take = (m: RegExpExecArray | null) => {
+            if (!m) return null
+            const done = Number(m[1])
+            const max = Number(m[2])
+            if (!Number.isFinite(done) || !Number.isFinite(max) || max <= 0 || max > 40 || done > max) return null
+            return { done, max }
+        }
+        const tight = take(new RegExp(`(\\d+)\\s*\\/\\s*(\\d+)[^\\d]{0,12}${word}`, 'i').exec(region))
+        if (tight) return tight
+        if (!new RegExp(word, 'i').test(region)) return null
+        // 退一步：这段里确实有"任务/tasks"，取第一个像样的小分数
+        for (const m of region.matchAll(/(\d+)\s*\/\s*(\d+)/g)) {
+            const found = take(m as unknown as RegExpExecArray)
+            if (found) return found
+        }
+        return null
+    }
+
     private isParentQuestId(offerId: string): boolean {
         const id = offerId.toLowerCase()
         if (id.includes('pcchild')) return false

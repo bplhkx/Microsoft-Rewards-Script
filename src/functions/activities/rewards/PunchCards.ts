@@ -120,7 +120,10 @@ export class PunchCards extends BaseActivity {
                 offerId: promotion.offerId,
                 title: promotion.title ?? '',
                 pointProgressMax: promotion.pointProgressMax ?? 0,
-                complete: Boolean(promotion.complete)
+                complete: Boolean(promotion.complete),
+                // 只在 HTML 里出现的 "3 / 12 tasks"，接口这条路径拿不到
+                tasksDone: null,
+                tasksMax: null
             })
             seen.add(promotion.offerId)
         }
