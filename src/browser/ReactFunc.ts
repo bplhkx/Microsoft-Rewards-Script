@@ -425,6 +425,30 @@ export default class ReactFunc {
     }
 
     /**
+     * 印章收集的真实进度（界面上那句 "3 / 12"）。
+     *
+     * 它既不在 /earn 的 flight 里，也不在仪表板接口的返回里（主接口一失败就退化成
+     * Bing flyout 的部分数据，punchCards 直接是空数组），只有 /dashboard 这一段有：
+     *   \"SnapshotSection_StreakBonus\",\"data\":{\"streakBonus\":1000,
+     *   \"activityProgress\":3,\"activitiesTotal\":12}
+     * 所以这里单独抓这一节。窗口先去掉 flight 的转义反斜杠，再按普通 JSON 取数。
+     */
+    public snapshotStreakBonus(html: string): { done: number; max: number } | null {
+        const at = html.indexOf('SnapshotSection_StreakBonus')
+        if (at < 0) return null
+
+        const window = html.slice(at, at + 400).replace(/\\/g, '')
+        const done = /"activityProgress"\s*:\s*(\d+)/.exec(window)?.[1]
+        const max = /"activitiesTotal"\s*:\s*(\d+)/.exec(window)?.[1]
+        if (!done || !max) return null
+
+        const d = Number(done)
+        const m = Number(max)
+        if (!m || d > m) return null
+        return { done: d, max: m }
+    }
+
+    /**
      * 把 streak 卡的结构化进度拼成 CHECKIN-PROGRESS 的参数：
      *   streak-bing=3/14 | tasks-bing=2/4
      * partner 有时是 URL 或带空格的显示名，所以统一 slug 化并截短；
