@@ -9,6 +9,8 @@ import { SearchQueryQueue } from '../../SearchQueryQueue'
 const LOG_TAG = 'DEFAULT-SEARCH-ENGINE'
 // 其它升级活动的天数走这个标签，面板按 title 分派捕获规则
 const PROGRESS_TAG = 'CHECKIN-PROGRESS'
+// 已经集满过几轮（hva_*_completed_amount），单独一个标签，面板存成 cycles-<name>
+const CYCLES_TAG = 'CHECKIN-CYCLES'
 const LEVEL_INFO_PROMOTION = 'level_info'
 
 const MAX_ATTEMPTS = 3
@@ -160,16 +162,29 @@ export class DefaultSearchEngine extends BaseActivity {
      */
     private logLevelInfoProgress(attributes: Record<string, string | undefined>): void {
         const parts: string[] = []
+        const cycles: string[] = []
         for (const [key, raw] of Object.entries(attributes)) {
-            if (!/^hva_/i.test(key) || !key.endsWith('_days') || raw === undefined) continue
-            const base = key.slice(0, -'_days'.length)
-            const days = Number(raw)
-            const daysMax = Number(attributes[`${base}_days_max`] ?? attributes[`${base}_max`])
-            if (!Number.isFinite(days) || !Number.isFinite(daysMax) || daysMax <= 0 || days > daysMax) continue
-            parts.push(`${base.replace(/^hva_/i, '')}=${days}/${daysMax}`)
+            if (!/^hva_/i.test(key) || raw === undefined) continue
+
+            if (key.endsWith('_days')) {
+                const base = key.slice(0, -'_days'.length)
+                const days = Number(raw)
+                const daysMax = Number(attributes[`${base}_days_max`] ?? attributes[`${base}_max`])
+                if (!Number.isFinite(days) || !Number.isFinite(daysMax) || daysMax <= 0 || days > daysMax) continue
+                parts.push(`${base.replace(/^hva_/i, '')}=${days}/${daysMax}`)
+                continue
+            }
+
+            // hva_<name>_completed_amount = 这个升级活动已经完整集满过几轮（也就是领到几次档位奖励）。
+            // 天数那一行给的是"当前这一轮第几天"，看不出总共拿过几次，所以单独打一行。
+            if (key.endsWith('_completed_amount')) {
+                const done = Number(raw)
+                if (!Number.isFinite(done) || done < 0) continue
+                cycles.push(`${key.slice(0, -'_completed_amount'.length).replace(/^hva_/i, '')}=${done}`)
+            }
         }
-        if (!parts.length) return
-        this.bot.logger.info(this.bot.isMobile, PROGRESS_TAG, parts.join(' | '))
+        if (parts.length) this.bot.logger.info(this.bot.isMobile, PROGRESS_TAG, parts.join(' | '))
+        if (cycles.length) this.bot.logger.info(this.bot.isMobile, CYCLES_TAG, cycles.join(' | '))
     }
 
     private fromWebDashboard(data: DashboardData): DefaultSearchEngineState | null {
