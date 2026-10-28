@@ -1,0 +1,67 @@
+name: CI
+
+# The existing formatting workflows only fire on pull_request / v3 / v4, so the
+# working branch had no build-or-test signal at all. This runs the checks that
+# actually catch a regression here: TypeScript build, eslint, and the three
+# node:test / assertion suites that exist in the repo.
+on:
+    push:
+        branches: ['V4-china', 'v4', 'v3', 'main']
+    pull_request:
+    workflow_dispatch:
+
+concurrency:
+    group: ci-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    build-and-test:
+        name: Build and test
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+
+        steps:
+            - name: Check out repository
+              uses: actions/checkout@v7
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v7
+              with:
+                  node-version: 24
+                  cache: npm
+
+            - name: Install dependencies
+              # --ignore-scripts: matches the other workflows, and keeps the
+              # patchright-core postinstall patch out of CI (it patches a
+              # browser bundle nothing here runs)
+              run: npm ci --ignore-scripts
+
+            - name: Build (tsc + assets)
+              run: npm run build
+
+            - name: Lint
+              run: npm run lint
+
+            - name: Log parser tests
+              run: node scripts/api/logParser.test.js
+
+            - name: Session platform tests
+              # DELETE /sessions/:email?platform= - mobile and desktop are
+              # separate logins, so a reset must never take the other one
+              run: node scripts/tests/sessionPlatform.cjs
+
+            - name: Streak bonus parser tests
+              # the stamp-collection progress reader used by CHECKIN-PROGRESS
+              run: node scripts/tests/streakBonus.cjs
+
+            - name: Assert the built output exists
+              # dist/index.js must never be required here - it starts a run
+              run: |
+                  set -euo pipefail
+                  test -f dist/index.js
+                  test -f dist/browser/BrowserFunc.js
+                  grep -q "DAILYSET_SETTLE_MS" dist/browser/BrowserFunc.js
+                  echo "dist looks right (BrowserFunc carries the render-gate fix)"
