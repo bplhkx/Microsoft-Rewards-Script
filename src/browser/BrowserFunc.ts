@@ -14,6 +14,14 @@ import type { AppEarnablePoints, BrowserEarnablePoints } from '../interface/Poin
 import type { AppDashboardData } from '../interface/AppDashBoardData'
 import { detectFlyoutBotWarning, mapFlyoutToDashboard, type RewardsFlyoutData } from './FlyoutDashboard'
 
+/**
+ * How long bootstrap waits for section#dailyset to appear in the DOM before reading the
+ * page. /earn is hydrated client-side, and a phone-grade CPU plus a slow CN route can push
+ * that past a couple of seconds; the element is what tells bootstrap it is really looking
+ * at a rendered dashboard.
+ */
+const DAILYSET_SETTLE_MS = 20000
+
 export default class BrowserFunc {
     private bot: MicrosoftRewardsBot
 
@@ -360,17 +368,67 @@ export default class BrowserFunc {
             // first-time welcome modal blocks the dashboard from rendering
             await this.dismissRewardsWelcomeDialog(page)
 
-            const earnDom = await page.content()
-            const earnRaw = await this.fetchBootstrapHtml(page, URLs.rewards.earn, '/earn')
+            const collect = async (): Promise<string[]> => {
+                // /earn is rendered client-side, so reading page.content() straight after
+                // domcontentloaded can return a shell without section#dailyset. Give the
+                // element a chance to appear before taking the DOM snapshot.
+                await page.waitForSelector('section#dailyset', { timeout: DAILYSET_SETTLE_MS }).catch(() => null)
 
-            this.rewardsDeploymentId = this.bot.browser.react.buildId(earnRaw || earnDom) ?? ''
+                const earnDom = await page.content().catch(() => '')
+                const earnRaw = await this.fetchBootstrapHtml(page, URLs.rewards.earn, '/earn')
+                // /dashboard carries chunks that /earn doesn't reference
+                const dashboardHtml = await this.fetchBootstrapHtml(page, URLs.rewards.dashboard, '/dashboard')
+
+                return [earnRaw, earnDom, dashboardHtml].filter(Boolean)
+            }
+
+            const mentionsDailySet = (sources: string[]): boolean =>
+                /<section\b[^>]*\bid=["']dailyset["']/i.test(sources.join('\n'))
+
+            let sources = await collect()
+
+            // One retry. The CN network to rewards.bing.com times out often enough that a
+            // single pass makes the mobile flow fail on a day where the login is perfectly
+            // fine; both observed failures (10-15 14:44 / 18:55) were exactly this shape:
+            // LOGIN -> LOGGED_IN -> Bing verified -> /earn + /dashboard fetch timeouts -> abort.
+            if (!mentionsDailySet(sources)) {
+                this.bot.logger.warn(
+                    this.bot.isMobile,
+                    'BOOTSTRAP',
+                    'section#dailyset missing on the first pass - re-reading /earn and /dashboard once before giving up'
+                )
+                await this.dismissRewardsWelcomeDialog(page)
+                sources = await collect()
+            }
+
+            // The gate is about rendering, so say which one it actually is. Bouncing to a
+            // non-rewards host is a login problem; staying on rewards without the section is
+            // a page/timeout problem and re-logging in would not fix it.
+            if (!mentionsDailySet(sources)) {
+                const host = (() => {
+                    try {
+                        return new URL(page.url()).host
+                    } catch {
+                        return 'unknown'
+                    }
+                })()
+                const looksSignedOut = !/rewards\.bing\.com|^www\.bing\.com$|account\.microsoft\.com/i.test(host)
+                this.bot.logger.warn(
+                    this.bot.isMobile,
+                    'BOOTSTRAP',
+                    `No section#dailyset after 2 passes | host=${host} | htmlSources=${sources.length}`
+                )
+                throw new Error(
+                    looksSignedOut
+                        ? `Rewards dashboard did not render (no section#dailyset) - redirected to ${host}, likely a login/redirect issue, aborting`
+                        : `Rewards dashboard did not render (no section#dailyset) - stayed on ${host}, so this is the page or the network timing out, not a login issue, aborting`
+                )
+            }
+
+            this.rewardsDeploymentId = this.bot.browser.react.buildId(sources.join('\n')) ?? ''
 
             this.bot.nextRouterStateTree = this.bot.browser.react.routerStateTree('earn')
 
-            // pull /dashboard HTML to capture chunks that /earn doesn't show
-            const dashboardHtml = await this.fetchBootstrapHtml(page, URLs.rewards.dashboard, '/dashboard')
-
-            const sources = [earnRaw, earnDom, dashboardHtml].filter(Boolean)
             const snapshot = this.bot.browser.react.snapshotPage(sources)
             this.bot.reactSnapshot = snapshot
             if (this.bot.isMobile) this.bot.reactSnapshots.mobile = snapshot
@@ -378,13 +436,6 @@ export default class BrowserFunc {
 
             // discovered from chunks referenced by either page
             this.bot.nextActions = await this.resolveActionIds(page, sources)
-
-            const dashboardRendered = /<section\b[^>]*\bid=["']dailyset["']/i.test(sources.join('\n'))
-            if (!dashboardRendered) {
-                throw new Error(
-                    'Rewards dashboard did not render (no section#dailyset) - likely a login/redirect issue, aborting'
-                )
-            }
 
             if (!this.bot.reactSnapshot.offers.length) {
                 this.bot.logger.warn(
