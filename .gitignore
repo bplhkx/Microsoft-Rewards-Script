@@ -20,7 +20,10 @@ note
 # 本地私密配置与编辑器工作目录，严禁提交
 /.env
 /.zcode/
-/scripts/tests
+/scripts/tests/*
+# CI 要跑的回归测试入库（其余本地临时脚本仍然忽略）
+!/scripts/tests/sessionPlatform.cjs
+!/scripts/tests/streakBonus.cjs
 /docs
 
 # 部署时手改出来的备份，里面是 .env/config.json 的旧值（含 token），永远不进仓库

@@ -471,15 +471,40 @@ const requestHandler = async (req, res) => {
                 return sendJson(res, 500, { error: 'config.json is invalid', detail: loaded.error })
 
             const sessionPath = typeof loaded.data.sessionPath === 'string' ? loaded.data.sessionPath : 'sessions'
-            const result = deleteStoredSessions(projectRoot, sessionPath, email)
-            if (!result.found) {
-                return sendJson(res, 404, {
-                    error: `No stored sessions found for ${email}.`,
-                    code: 'SESSION_NOT_FOUND'
+
+            // ?platform=mobile|desktop|both - the two rows are separate logins, so a reset
+            // can be scoped to the one that is actually broken
+            const requestedPlatform = (url.searchParams.get('platform') ?? 'both').trim().toLowerCase()
+            if (!['mobile', 'desktop', 'both'].includes(requestedPlatform)) {
+                return sendJson(res, 400, {
+                    error: 'platform must be one of: mobile, desktop, both.',
+                    code: 'INVALID_PLATFORM'
                 })
             }
 
-            pm.note('info', `Deleted ${result.removed} stored session row(s) for ${result.email} via API.`)
+            const result = deleteStoredSessions(projectRoot, sessionPath, email, requestedPlatform)
+            if (result.invalidPlatform) {
+                // belt and braces: the store refuses an unknown scope rather than widening it
+                return sendJson(res, 400, {
+                    error: 'platform must be one of: mobile, desktop, both.',
+                    code: 'INVALID_PLATFORM'
+                })
+            }
+            if (!result.found) {
+                return sendJson(res, 404, {
+                    error:
+                        result.remaining?.length
+                            ? `No stored ${requestedPlatform} session for ${email}; it still has: ${result.remaining.join(', ')}.`
+                            : `No stored sessions found for ${email}.`,
+                    code: 'SESSION_NOT_FOUND',
+                    remaining: result.remaining ?? []
+                })
+            }
+
+            pm.note(
+                'info',
+                `Deleted ${result.removed} stored session row(s) for ${result.email} (${result.scope}) via API.`
+            )
             return sendJson(res, 200, { deleted: true, ...result })
         }
 
