@@ -433,7 +433,7 @@ server itself remains dependency-free.
 | `POST`   | `/stop`            | Request graceful or forced process termination.         |
 | `POST`   | `/restart`         | Stop an active run, then start a new one.               |
 | `POST`   | `/shutdown`        | Stop the bot if needed and terminate the API process.   |
-| `DELETE` | `/sessions/:email` | Delete only one account's mobile and desktop sessions.  |
+| `DELETE` | `/sessions/:email` | Delete one account's sessions, optionally one `?platform=` only.  |
 | `PUT`    | `/config`          | Replace the complete config after validation.           |
 | `PATCH`  | `/config`          | Deep-merge a partial config after validation.           |
 | `PUT`    | `/schedule`        | Persist and immediately apply supplied schedule fields. |
@@ -1032,9 +1032,23 @@ When no session database exists, the endpoint still returns `200 OK` with
 
 ### `DELETE /sessions/:email`
 
-Deletes all stored platforms for one case-insensitive, exact account email. The
+Deletes stored sessions for one case-insensitive, exact account email. The
 email must be URL-encoded as one path value. There is intentionally no API
 endpoint for deleting all sessions.
+
+Mobile and desktop are two independent logins in `sessions.db`, so the delete
+can be scoped with `?platform=`:
+
+| `platform`            | effect                                            |
+| --------------------- | ------------------------------------------------- |
+| omitted or `both`     | delete both rows (the original behaviour)         |
+| `mobile`              | delete only the mobile row; the desktop login stays  |
+| `desktop`             | delete only the desktop row; the mobile login stays  |
+
+Any other value returns `400 INVALID_PLATFORM` and deletes nothing - an
+unrecognised scope never widens to "both", because that would drop the login
+the caller meant to keep. `account_metadata` (the resolved region, shared by
+both platforms) is only cleared when both rows go.
 
 The bot must be idle. Deleting while a run is starting, running, or stopping
 returns `409 Conflict`, because an active process could otherwise write the
@@ -1043,8 +1057,9 @@ session back after deletion.
 **cURL**
 
 ```bash
+# reset only the mobile login; the next run signs that platform in again
 curl --request DELETE \
-  --url http://127.0.0.1:3010/sessions/user%40example.com \
+  --url 'http://127.0.0.1:3010/sessions/user%40example.com?platform=mobile' \
   --header 'Authorization: Bearer YOUR_API_TOKEN'
 ```
 
@@ -1052,7 +1067,9 @@ curl --request DELETE \
 
 ```js
 const email = 'user@example.com'
-const { data } = await api.delete(`/sessions/${encodeURIComponent(email)}`)
+const { data } = await api.delete(`/sessions/${encodeURIComponent(email)}`, {
+    params: { platform: 'mobile' },
+})
 console.log(data)
 ```
 
@@ -1060,15 +1077,20 @@ console.log(data)
 {
     "deleted": true,
     "found": true,
-    "removed": 2,
+    "removed": 1,
     "email": "user@example.com",
-    "platforms": ["desktop", "mobile"]
+    "platforms": ["mobile"],
+    "remaining": ["desktop"],
+    "scope": "mobile"
 }
 ```
 
-If the account has no stored sessions, the endpoint returns `404 Not Found`
-with code `SESSION_NOT_FOUND`. `DELETE /sessions` without an email and invalid
-email paths return `400 Bad Request`. The endpoint accepts no JSON body.
+If the account has no stored sessions at all, or has one but not on the
+requested platform, the endpoint returns `404 Not Found` with code
+`SESSION_NOT_FOUND`; `remaining` then lists the platforms that are still
+signed in, so a UI can say "this account only has a desktop session".
+`DELETE /sessions` without an email and invalid email paths return
+`400 Bad Request`. The endpoint accepts no JSON body.
 
 ## Reading diagnostics
 

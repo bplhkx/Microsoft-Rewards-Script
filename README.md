@@ -254,7 +254,8 @@ docker compose restart          # 重启（不重建）
 
 - 查询健康状态 / 运行状态 / 实时积分 / 日志 / 账户摘要 / 运行历史
 - `POST /start` 启动全部或指定账户，`POST /stop`、`POST /restart` 控制
-- `GET /events` SSE 实时日志流；会话查询与删除
+- `GET /events` SSE 实时日志流
+- 会话管理：`GET /sessions` 看每个账号存了哪些平台的登录；`DELETE /sessions/:email?platform=mobile|desktop|both` 重置登录状态（移动端和桌面端是两条独立登录，只清坏的那条；下一轮取不到 cookie 就会用账号密码重新登录）
 - 完整文档见 [`scripts/api/README.md`](scripts/api/README.md)
 
 配套 Web 面板推荐 [Rewards Dashboard](https://github.com/mgrimace/rewards-dashboard)，可管理运行、账户、调度、日志、积分。
@@ -441,6 +442,20 @@ docker compose restart          # 重启（不重建）
 > 💡 想手动强制重跑当天已成功的任务：临时把 `skipWhenCompletedToday` 改为 `false`（或删除 `logs/last-success.txt`）。
 > 拟人化参数不分轮次：无论第几次运行都用同一套随机规则，作用于"当时的剩余额度"。
 
+> 💡 拆几轮才划算（`searchTargetRatio` 是"这一轮做掉**剩余额度**的比例"，不是当天的固定比例）：
+> 一天跑两轮、每轮都抽同一个 r，当天完成度就是 `1-(1-r)²`。
+>
+> | r 的区间 | 上午做掉 | 下午还有 | 当天完成度期望 | 平均漏分（搜索 60 分/天） |
+> | -------- | -------- | -------- | -------------- | ------------------------- |
+> | 0.85–1   | 85–100%  | 0–9 分   | 97.5%          | 1.5 分（下午常常无事可做） |
+> | 0.7–0.85 | 70–85%   | 9–18 分  | 94.7%          | 3 分                       |
+> | 0.5–1    | 50–100%  | 0–30 分  | 91.7%          | 5 分（方差最大）           |
+> | 0.5–0.65 | 50–65%   | 12–30 分 | 82.8%          | 10 分                      |
+>
+> 想"下午确实有一段独立的活"又不怎么掉分，取 **0.7–0.85** 这一档；上限写 1 的话，抽到接近 1 的那天下午那轮等于白跑。
+> 只有**搜索**和 **Read to Earn 篇数**会被拆开：印章卡、每日套装、推广、签到、连胜卡都在第一轮一次做完。
+> Read to Earn 不查当天额度，每轮都会把 `readToEarnArticles` 那么多篇全发一遍（多出来的上报不计分），所以这个数别设到 10——两轮各 6–8 篇已经能拿满 30 分。
+
 </details>
 
 <details>
@@ -543,6 +558,18 @@ npm run manual-login -- --email user@example.com --fresh        # 忽略已有 c
 ```
 
 </details>
+<details>
+<summary><b>日志里 <code>Rewards dashboard did not render (no section#dailyset)</code>，是登录坏了吗？</b></summary>
+
+**多数时候不是。** 这句出自 `bootstrap()` 的渲染闸门：它读 `/earn` 与 `/dashboard`，然后在拿到的 HTML/DOM 里找 `<section id="dailyset">`，找不到就中止本轮。国内到 `rewards.bing.com` 经常 20 秒超时，两个页面的 HTML 都没取到时只剩一份还没水合完的 DOM，那一节自然还没有，于是被误判成"登录/重定向问题"。
+
+现在的做法是：先 `waitForSelector('section#dailyset')` 给 20 秒，读不到就**整段重读一次**，两次都没有才中止；中止时的文案也会分清两种情况——停在非 rewards 域名上才是登录/重定向问题，仍停在 `rewards.bing.com` 就是页面或网络超时，**重新登录不会修好它**。
+
+怎么判断：看失败前几行有没有 `Failed to fetch /earn HTML | ... Timeout 20000ms` 或 `socket hang up`。有，就是超时；如果同时段 `LOGIN` 一路走到 `Successfully logged in`，登录本身是好的，不要为此清会话。同一轮里若还有 `获取仪表板数据失败（主接口与 Bing flyout 兜底均失败）`、`Request timeout (20000 ms) exceeded`，也是同一个网络抖动。
+
+</details>
+
+
 
 <details>
 <summary><b>修改 <code>.env</code> / <code>config.json</code> 后怎么生效？</b></summary>
