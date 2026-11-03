@@ -256,6 +256,7 @@ docker compose restart          # 重启（不重建）
 - `POST /start` 启动全部或指定账户，`POST /stop`、`POST /restart` 控制
 - `GET /events` SSE 实时日志流
 - 会话管理：`GET /sessions` 看每个账号存了哪些平台的登录；`DELETE /sessions/:email?platform=mobile|desktop|both` 重置登录状态（移动端和桌面端是两条独立登录，只清坏的那条；下一轮取不到 cookie 就会用账号密码重新登录）
+- 进度类日志行是给面板入库的契约，别随意改格式：`CHECKIN-PROGRESS`（打卡与印章 `x/y`）、`CHECKIN-CYCLES`（某活动已集满几轮）、`STAR-BONUS tracking=x/y`（必应 Star 奖励的「奖励追踪」：本月累计分 / 每月目标，取自 `/dashboard` 的 `starbonus` 模型）
 - 完整文档见 [`scripts/api/README.md`](scripts/api/README.md)
 
 配套 Web 面板推荐 [Rewards Dashboard](https://github.com/mgrimace/rewards-dashboard)，可管理运行、账户、调度、日志、积分。

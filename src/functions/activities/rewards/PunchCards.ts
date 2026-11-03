@@ -53,7 +53,7 @@ export class PunchCards extends BaseActivity {
         )
 
         this.mergeApiParents(parents, apiById)
-        await this.logStampProgress()
+        await this.logDashboardCounters()
         const pending = parents.filter(parent => {
             if (parent.complete) return false
             return !this.bot.config.skipNonPointTasks || parent.pointProgressMax > 0
@@ -136,35 +136,47 @@ export class PunchCards extends BaseActivity {
     }
 
     /**
-     * 印章收集的真实进度（界面上那句 "3 / 12"）只有 /dashboard 的 flight 里有。
-     * 两条看起来更顺路的路都实测过、都拿不到：
+     * 印章收集进度（界面上那句 "3 / 12"）和「奖励追踪」（必应 Star 奖励那个本月计数）
+     * 只有 /dashboard 的 flight 里有。两条看起来更顺路的路都实测过、都拿不到：
      *   · 仪表板接口：主接口一失败就退化成 Bing flyout，那份数据里 punchCards 是空数组
      *     （日志里的 apiMatched=0 就是它），parentPromotion.activityProgress 无从取用；
-     *   · /earn 的 QuestSection：只有每张卡自己的 "0 / 8 个任务"，整个页面没有 12 这个数。
-     * 所以这里多读一次 /dashboard（只读页面，不 reportActivity、不领取任何东西）。
-     * 解析不出来就什么都不写，绝不拿单卡数字冒充收集进度。
+     *   · /earn 的 QuestSection：只有每张卡自己的 "0 / 8 个任务"，整个页面没有 12 这个数，
+     *     也没有 starbonus 这一节。
+     * 所以这里读一次 /dashboard（只读页面，不 reportActivity、不领取任何东西），两个计数
+     * 都从同一份 HTML 里抠，不再多开页面。解析不出来就什么都不写，绝不拿邻近数字冒充。
      */
-    private async logStampProgress(): Promise<void> {
+    private async logDashboardCounters(): Promise<void> {
         try {
             const html = await this.bot.browser.func.getRewardsPageHtml(URLs.rewards.dashboard, '/dashboard')
             if (!html) return
 
             const stamps = this.bot.browser.react.snapshotStreakBonus(html)
-            if (!stamps) {
-                this.bot.logger.debug(this.bot.isMobile, 'PUNCHCARD', 'SnapshotSection_StreakBonus not found in /dashboard')
-                return
+            if (stamps) {
+                this.bot.logger.info(
+                    this.bot.isMobile,
+                    'CHECKIN-PROGRESS',
+                    `punch=${Math.min(stamps.done, stamps.max)}/${stamps.max}`
+                )
+            } else {
+                this.bot.logger.debug(
+                    this.bot.isMobile,
+                    'PUNCHCARD',
+                    'SnapshotSection_StreakBonus not found in /dashboard'
+                )
             }
 
-            this.bot.logger.info(
-                this.bot.isMobile,
-                'CHECKIN-PROGRESS',
-                `punch=${Math.min(stamps.done, stamps.max)}/${stamps.max}`
-            )
+            // 单独一个 title：这是月度累计值，不是"今天第几天"，别混进打卡那一串
+            const star = this.bot.browser.react.snapshotStarBonus(html)
+            if (star) {
+                this.bot.logger.info(this.bot.isMobile, 'STAR-BONUS', `tracking=${star.current}/${star.max}`)
+            } else {
+                this.bot.logger.debug(this.bot.isMobile, 'PUNCHCARD', 'starbonus tracker not found in /dashboard')
+            }
         } catch (error) {
             this.bot.logger.debug(
                 this.bot.isMobile,
                 'PUNCHCARD',
-                `Failed reading the stamp collection progress | ${error instanceof Error ? error.message : String(error)}`
+                `Failed reading the dashboard counters | ${error instanceof Error ? error.message : String(error)}`
             )
         }
     }

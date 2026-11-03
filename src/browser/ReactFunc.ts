@@ -449,6 +449,38 @@ export default class ReactFunc {
     }
 
     /**
+     * 「奖励追踪」（必应 Star 奖励弹层里那个大数）只在 /dashboard 的 flight 里有：
+     *   {"type":"starbonus","model":{"bonus":{"prevPointsEarned":60,"prevPointsMax":2100,
+     *    "pointsMax":2100,"pointsPerLevel":{"1":300,"2":900,"3":2100},"state":"complete",
+     *    "currentProgress":60,"showIncrementalTracker":false}}}
+     * 界面把它和"上个月赚取的积分: prevPointsEarned/prevPointsMax"分两处显示，
+     * currentProgress 才是追踪条上那个数（2026-11-03 实测：四个账号 currentProgress
+     * 分别是 60/60/60/30，prev 是 60/60/0/60，两栏不是同一个值）。
+     * 同一页还有两处 "starbonus" 是档位权益文案，不带 currentProgress，跳过即可。
+     */
+    public snapshotStarBonus(html: string): { current: number; max: number } | null {
+        let from = 0
+        while (from < html.length) {
+            const at = html.indexOf('starbonus', from)
+            if (at < 0) break
+            from = at + 'starbonus'.length
+
+            // flight 里引号是 \"，去掉反斜杠再按普通 JSON 取数
+            const window = html.slice(at, at + 600).replace(/\\/g, '')
+            const current = /"currentProgress"\s*:\s*(\d+)/.exec(window)?.[1]
+            const max = /"pointsMax"\s*:\s*(\d+)/.exec(window)?.[1]
+            if (!current || !max) continue
+
+            const c = Number(current)
+            const m = Number(max)
+            // 分母异常或本月超过本月目标时宁可不写，别拿猜的值上界面
+            if (!m || c > m) continue
+            return { current: c, max: m }
+        }
+        return null
+    }
+
+    /**
      * 把 streak 卡的结构化进度拼成 CHECKIN-PROGRESS 的参数：
      *   streak-bing=3/14 | tasks-bing=2/4
      * partner 有时是 URL 或带空格的显示名，所以统一 slug 化并截短；

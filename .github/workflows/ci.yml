@@ -57,6 +57,10 @@ jobs:
               # the stamp-collection progress reader used by CHECKIN-PROGRESS
               run: node scripts/tests/streakBonus.cjs
 
+            - name: Star bonus parser tests
+              # the 奖励追踪 (Bing Star) counter read from the same /dashboard HTML
+              run: node scripts/tests/starBonus.cjs
+
             - name: Assert the built output exists
               # dist/index.js must never be required here - it starts a run
               run: |
